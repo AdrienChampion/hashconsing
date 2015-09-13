@@ -100,11 +100,17 @@ Creates a hash consed type for some type.
 */
 #[macro_export]
 macro_rules! hash_cons {
-  ($id:ident for $t:ty) => (
-    type $id = ::std::rc::Rc<$crate::HashConsed<$t>> ;
+  ($tgt:ident for $src:ty) => (
+    type $tgt = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
-  (pub $id:ident for $t:ty) => (
-    pub type $id = ::std::rc::Rc<$crate::HashConsed<$t>> ;
+  ($tgt:ident<$($param:ty),+> for $src:ty) => (
+    type $tgt<$($param),+> = ::std::rc::Rc<$crate::HashConsed<$src>> ;
+  ) ;
+  (pub $tgt:ident for $src:ty) => (
+    pub type $tgt = ::std::rc::Rc<$crate::HashConsed<$src>> ;
+  ) ;
+  (pub $tgt:ident<$($param:ty),+> for $src:ty) => (
+    pub type $tgt<$($param),+> = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
 }
 
@@ -395,11 +401,17 @@ pub mod sync {
   */
   #[macro_export]
   macro_rules! sync_hash_cons {
-    ($id:ident for $t:ty) => (
-      type $id = ::std::sync::Arc<$crate::HashConsed<$t>> ;
+    ($tgt:ident for $src:ty) => (
+      type $tgt = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
-    (pub $id:ident for $t:ty) => (
-      pub type $id = ::std::sync::Arc<$crate::HashConsed<$t>> ;
+    ($tgt:ident<$($param:ty),+> for $src:ty) => (
+      type $tgt<$($param),+> = ::std::sync::Arc<$crate::HashConsed<$src>> ;
+    ) ;
+    (pub $tgt:ident for $src:ty) => (
+      pub type $tgt = ::std::sync::Arc<$crate::HashConsed<$src>> ;
+    ) ;
+    (pub $tgt:ident<$($param:ty),+> for $src:ty) => (
+      pub type $tgt<$($param),+> = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
   }
 
