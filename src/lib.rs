@@ -103,13 +103,13 @@ macro_rules! hash_cons {
   ($tgt:ident for $src:ty) => (
     type $tgt = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
-  ($tgt:ident<$($param:ty),+> for $src:ty) => (
+  ($tgt:ident<$($param:ident),+> for $src:ty) => (
     type $tgt<$($param),+> = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
   (pub $tgt:ident for $src:ty) => (
     pub type $tgt = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
-  (pub $tgt:ident<$($param:ty),+> for $src:ty) => (
+  (pub $tgt:ident<$($param:ident),+> for $src:ty) => (
     pub type $tgt<$($param),+> = ::std::rc::Rc<$crate::HashConsed<$src>> ;
   ) ;
 }
@@ -404,13 +404,13 @@ pub mod sync {
     ($tgt:ident for $src:ty) => (
       type $tgt = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
-    ($tgt:ident<$($param:ty),+> for $src:ty) => (
+    ($tgt:ident<$($param:ident),+> for $src:ty) => (
       type $tgt<$($param),+> = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
     (pub $tgt:ident for $src:ty) => (
       pub type $tgt = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
-    (pub $tgt:ident<$($param:ty),+> for $src:ty) => (
+    (pub $tgt:ident<$($param:ident),+> for $src:ty) => (
       pub type $tgt<$($param),+> = ::std::sync::Arc<$crate::HashConsed<$src>> ;
     ) ;
   }
