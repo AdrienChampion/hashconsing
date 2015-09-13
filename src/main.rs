@@ -13,7 +13,7 @@ mod sync {
 
   sync_hash_cons!{pub Term for ActualTerm}
 
-
+  #[derive(Hash)]
   pub enum ActualTerm {
     Var(usize),
     Lam(Term),
@@ -26,28 +26,14 @@ mod sync {
         (& Var(i), & Var(j)) =>
           i == j,
         (& Lam(ref t1), & Lam(ref t2)) =>
-          t1.uid() == t2.uid(),
+          t1.hkey() == t2.hkey(),
         (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-          u1.uid() == u2.uid() && v1.uid() == v2.uid(),
+          u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
         _ => false
       }
     }
   }
   impl Eq for ActualTerm {}
-  impl UID for ActualTerm {
-    fn uid(& self) -> usize {
-      match self {
-        & Var(i) => i,
-        & Lam(ref t) => 19 * t.uid() + 1,
-        & App(ref u, ref v) => 19 * (19 * u.uid() + v.uid()) + 2,
-      }
-    }
-  }
-  impl Hash for ActualTerm {
-    fn hash<H>(& self, state: & mut H) where H: Hasher {
-      self.uid().hash(state)
-    }
-  }
 
 
   impl fmt::Display for ActualTerm {
@@ -171,7 +157,7 @@ mod unsync {
 
   hash_cons!{pub Term for ActualTerm}
 
-
+  #[derive(Hash)]
   pub enum ActualTerm {
     Var(usize),
     Lam(Term),
@@ -184,28 +170,14 @@ mod unsync {
         (& Var(i), & Var(j)) =>
           i == j,
         (& Lam(ref t1), & Lam(ref t2)) =>
-          t1.uid() == t2.uid(),
+          t1.hkey() == t2.hkey(),
         (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-          u1.uid() == u2.uid() && v1.uid() == v2.uid(),
+          u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
         _ => false
       }
     }
   }
   impl Eq for ActualTerm {}
-  impl UID for ActualTerm {
-    fn uid(& self) -> usize {
-      match self {
-        & Var(i) => i,
-        & Lam(ref t) => 19 * t.uid() + 1,
-        & App(ref u, ref v) => 19 * (19 * u.uid() + v.uid()) + 2,
-      }
-    }
-  }
-  impl Hash for ActualTerm {
-    fn hash<H>(& self, state: & mut H) where H: Hasher {
-      self.uid().hash(state)
-    }
-  }
 
 
   impl fmt::Display for ActualTerm {

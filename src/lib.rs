@@ -23,7 +23,7 @@ use ::ActualTerm::* ;
 
 hash_cons!{pub Term for ActualTerm}
 
-
+#[derive(Hash)]
 pub enum ActualTerm {
   Var(usize),
   Lam(Term),
@@ -36,28 +36,14 @@ impl PartialEq for ActualTerm {
       (& Var(i), & Var(j)) =>
         i == j,
       (& Lam(ref t1), & Lam(ref t2)) =>
-        t1.uid() == t2.uid(),
+        t1.hkey() == t2.hkey(),
       (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-        u1.uid() == u2.uid() && v1.uid() == v2.uid(),
+        u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
       _ => false
     }
   }
 }
 impl Eq for ActualTerm {}
-impl UID for ActualTerm {
-  fn uid(& self) -> usize {
-    match self {
-      & Var(i) => i,
-      & Lam(ref t) => 19 * t.uid() + 1,
-      & App(ref u, ref v) => 19 * (19 * u.uid() + v.uid()) + 2,
-    }
-  }
-}
-impl Hash for ActualTerm {
-  fn hash<H>(& self, state: & mut H) where H: Hasher {
-    self.uid().hash(state)
-  }
-}
 
 
 trait TermFactory {
@@ -139,7 +125,8 @@ macro_rules! consign_mk_fun {
   ) ;
   ($tbl_expr:expr, $elm:ident, $ref_type:ident) => ({
     let table = & mut $tbl_expr ;
-    let hkey = $elm.uid() ;
+    let mut hasher = ::std::hash::SipHasher::new() ;
+    let hkey = { $elm.hash(& mut hasher) ; hasher.finish() } ;
     // If the element is known return it.
     if let Some(consed) = table.get(& hkey) { return consed.clone() } ;
     // Otherwise build the hash consed version...
@@ -155,13 +142,6 @@ macro_rules! consign_mk_fun {
 
 
 
-/// Can produce a **unique** identifier. Used for hashing.
-pub trait UID: Eq {
-  /// Returns a unique identifier.
-  fn uid(& self) -> usize ;
-}
-
-
 /**
 Stores a hash consed element and its hash in order to avoid recomputing it
 every time. A (synced) consign stores stores `Rc`s (`Arc`s) of that type for
@@ -171,16 +151,14 @@ pub struct HashConsed<T> {
   /// The actual element.
   elm: T,
   /// Stores the hash key of the element.
-  hkey: usize,
+  hkey: u64,
 }
 
 impl<T> HashConsed<T> {
   /// The element hash consed.
   pub fn get(& self) -> & T { & self.elm }
-}
-
-impl<T> UID for HashConsed<T> {
-  fn uid(& self) -> usize { self.hkey }
+  /// The hash of the element.
+  pub fn hkey(& self) -> u64 { self.hkey }
 }
 
 impl<T> PartialEq for HashConsed<T> {
@@ -215,12 +193,12 @@ impl<T: fmt::Display> fmt::Display for HashConsed<T> {
 pub type HConsed<T> = Rc<HashConsed<T>> ;
 
 /// The consign storing the actual hash consed elements as `Rc`s.
-pub struct HashConsign<T> where T: UID + Hash {
+pub struct HashConsign<T> where T: Hash {
   /// The actual hash consing table.
-  table: HashMap<usize, HConsed<T>>,
+  table: HashMap<u64, HConsed<T>>,
 }
 
-impl<T> HashConsign<T> where T: UID + Hash {
+impl<T> HashConsign<T> where T: Hash {
   /// Creates an empty consign.
   pub fn empty() -> Self {
     HashConsign { table: HashMap::new() }
@@ -238,7 +216,7 @@ impl<T> HashConsign<T> where T: UID + Hash {
   pub fn len(& self) -> usize { self.table.len() }
 }
 
-impl<T> fmt::Display for HashConsign<T> where T: UID + Hash + fmt::Display {
+impl<T> fmt::Display for HashConsign<T> where T: Hash + fmt::Display {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     try!( write!(fmt, "consign:") ) ;
     for (_, ref e) in self.table.iter() {
@@ -271,7 +249,7 @@ use self::ActualTerm::* ;
 
 sync_hash_cons!{pub Term for ActualTerm}
 
-
+#[derive(Hash)]
 pub enum ActualTerm {
   Var(usize),
   Lam(Term),
@@ -284,28 +262,14 @@ impl PartialEq for ActualTerm {
       (& Var(i), & Var(j)) =>
         i == j,
       (& Lam(ref t1), & Lam(ref t2)) =>
-        t1.uid() == t2.uid(),
+        t1.hkey() == t2.hkey(),
       (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-        u1.uid() == u2.uid() && v1.uid() == v2.uid(),
+        u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
       _ => false
     }
   }
 }
 impl Eq for ActualTerm {}
-impl UID for ActualTerm {
-  fn uid(& self) -> usize {
-    match self {
-      & Var(i) => i,
-      & Lam(ref t) => 19 * t.uid() + 1,
-      & App(ref u, ref v) => 19 * (19 * u.uid() + v.uid()) + 2,
-    }
-  }
-}
-impl Hash for ActualTerm {
-  fn hash<H>(& self, state: & mut H) where H: Hasher {
-    self.uid().hash(state)
-  }
-}
 
 
 impl fmt::Display for ActualTerm {
@@ -424,8 +388,7 @@ pub mod sync {
   use std::collections::HashMap ;
   use std::sync::{ Arc, Mutex } ;  
   use std::sync::mpsc::{ Sender, SendError } ;
-  pub use ::{ Hash, Hasher } ;
-  pub use ::{ UID, HashConsed } ;
+  pub use ::{ Hash, Hasher, HashConsed } ;
 
   /**
   Creates a thread safe hash consed type for some type.
@@ -451,12 +414,12 @@ pub mod sync {
   The consign storing the actual hash consed elements as `Rc`s. The hash map is
   wrapped in a mutex for thread-safety.
   */
-  pub struct HashConsign<T> where T: UID + Hash {
+  pub struct HashConsign<T> where T: Hash {
     /// The actual hash consing table.
-    table: Mutex<HashMap<usize, HConsed<T>>>,
+    table: Mutex<HashMap<u64, HConsed<T>>>,
   }
 
-  impl<T> HashConsign<T> where T: UID + Hash {
+  impl<T> HashConsign<T> where T: Hash {
     /// Creates an empty consign.
     pub fn empty() -> Self {
       HashConsign { table: Mutex::new(HashMap::new()) }
@@ -481,9 +444,9 @@ pub mod sync {
     pub fn len(& self) -> usize { self.table.lock().unwrap().len() }
   }
 
-  unsafe impl<T> Sync for HashConsign<T> where T: UID + Hash { }
+  unsafe impl<T> Sync for HashConsign<T> where T: Hash { }
 
-  impl<T> fmt::Display for HashConsign<T> where T: UID + Hash + fmt::Display {
+  impl<T> fmt::Display for HashConsign<T> where T: Hash + fmt::Display {
     fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
       try!( write!(fmt, "consign:") ) ;
       let table = self.table.lock().unwrap() ;
