@@ -2,6 +2,8 @@
 Hash consing library. Ideally we'd like to use weak references in the consign
 but they're currently feature gated. Waiting for dust to settle.
 
+Module `sync` contains a thread-safe version.
+
 See the [paper by Filiâtre and Conchon](http://dl.acm.org/citation.cfm?doid=1159876.1159880).
 
 # Example
@@ -109,7 +111,7 @@ use std::cmp::{
 
 /**
 Creates a hash consed type for some type.
-**/
+*/
 #[macro_export]
 macro_rules! hash_cons {
   ($id:ident for $t:ty) => (
@@ -120,6 +122,39 @@ macro_rules! hash_cons {
   ) ;
 }
 
+/**
+Creates the `mk` function on a consign used to hash cons elements. Used to
+factor the synced and unsynced versions.
+*/
+macro_rules! consign_mk_fun {
+  (synced for $t:ty) => (
+    pub fn mk(& self, elm: $t) -> HConsed<$t> {
+      consign_mk_fun!( self.table.lock().unwrap(), elm, Arc )
+    }
+  ) ;
+  (unsynced for $t:ty) => (
+    pub fn mk(& mut self, elm: $t) -> HConsed<$t> {
+      consign_mk_fun!( self.table, elm, Rc )
+    }
+  ) ;
+  ($tbl_expr:expr, $elm:ident, $ref_type:ident) => ({
+    let table = & mut $tbl_expr ;
+    let hkey = $elm.uid() ;
+    // If the element is known return it.
+    if let Some(consed) = table.get(& hkey) { return consed.clone() } ;
+    // Otherwise build the hash consed version...
+    let consed = $ref_type::new(HashConsed{ elm: $elm, hkey: hkey }) ;
+    // ...add it to the table...
+    match table.insert(hkey, consed.clone()) {
+      None => (), _ => unreachable!(),
+    } ;
+    // ...and return it.
+    consed
+  }) ;
+}
+
+
+
 /// Can produce a **unique** identifier. Used for hashing.
 pub trait UID: Eq {
   /// Returns a unique identifier.
@@ -129,59 +164,60 @@ pub trait UID: Eq {
 
 /**
 Stores a hash consed element and its hash in order to avoid recomputing it
-every time. The type stored by the consign is actually
-```Rc<HashConsed<T>>```.
-**/
-pub struct HashConsed<T> where T: UID {
+every time. A (synced) consign stores stores `Rc`s (`Arc`s) of that type for
+(thread-safe) sharing.
+*/
+pub struct HashConsed<T> {
   /// The actual element.
   elm: T,
   /// Stores the hash key of the element.
   hkey: usize,
 }
 
-impl<T: UID> HashConsed<T> {
+impl<T> HashConsed<T> {
   /// The element hash consed.
   pub fn get(& self) -> & T { & self.elm }
 }
 
-impl<T: UID> UID for HashConsed<T> {
+impl<T> UID for HashConsed<T> {
   fn uid(& self) -> usize { self.hkey }
 }
 
-impl<T: UID> PartialEq for HashConsed<T> {
+impl<T> PartialEq for HashConsed<T> {
   fn eq(& self, rhs: & Self) -> bool {
     self.hkey == rhs.hkey
   }
 }
-impl<T: UID> Eq for HashConsed<T> {}
-impl<T: UID> PartialOrd for HashConsed<T> {
+impl<T> Eq for HashConsed<T> {}
+impl<T> PartialOrd for HashConsed<T> {
   fn partial_cmp(& self, other: & Self) -> Option<Ordering> {
     self.hkey.partial_cmp(& other.hkey)
   }
 }
-impl<T: UID> Ord for HashConsed<T> {
+impl<T> Ord for HashConsed<T> {
   fn cmp(& self, other: & Self) -> Ordering {
     self.hkey.cmp(& other.hkey)
   }
 }
-impl<T: UID> Hash for HashConsed<T> {
+impl<T> Hash for HashConsed<T> {
   fn hash<H>(& self, state: & mut H) where H: Hasher {
     self.hkey.hash(state)
   }
 }
 
-impl<T: UID + fmt::Display> fmt::Display for HashConsed<T> {
+impl<T: fmt::Display> fmt::Display for HashConsed<T> {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     write!(fmt, "{}", self.elm)
   }
 }
 
-
+/// Actual type stored and returned by the consign.
+pub type HConsed<T> = Rc<HashConsed<T>> ;
 
 /// The consign storing the actual hash consed elements as `Rc`s.
 pub struct HashConsign<T> where T: UID + Hash {
   /// The actual hash consing table.
-  table: HashMap<usize, Rc<HashConsed<T>>>,
+  table: HashMap<usize, HConsed<T>>,
 }
 
 impl<T> HashConsign<T> where T: UID + Hash {
@@ -196,68 +232,100 @@ impl<T> HashConsign<T> where T: UID + Hash {
   }
 
   /// Hash conses something and returns the hash consed version.
-  pub fn mk(& mut self, elm: T) -> Rc<HashConsed<T>>
-  where HashConsed<T>: Sized {
-    let hkey = elm.uid() ;
-    let _ = match self.table.get(& hkey) {
-      Some(consed) => return consed.clone(),
-      _ => (),
-    } ;
-    let consed = Rc::new(HashConsed{ elm: elm, hkey: hkey }) ;
-    match self.table.insert(hkey, consed.clone()) {
-      None => (),
-      _ => unreachable!(),
-    } ;
-    consed
-  }
+  consign_mk_fun!{ unsynced for T }
 
   /// The number of elements stored, mostly for testing.
   pub fn len(& self) -> usize { self.table.len() }
 }
 
+impl<T> fmt::Display for HashConsign<T> where T: UID + Hash + fmt::Display {
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+    try!( write!(fmt, "consign:") ) ;
+    for (_, ref e) in self.table.iter() {
+      try!( write!(fmt, "\n  | {}", e) ) ;
+    }
+    Ok(())
+  }
+}
 
-// Code for weak refs in consign
 
-// /// The consign storing the actual hash consed elements as `Rc`s.
-// pub struct HashConsign<T> where T: UID + Hash {
-//   table: HashMap<usize, Weak<HashConsed<T>>>,
-// }
 
-// impl<T> HashConsign<T> where T: UID + Hash {
-// /// Creates an empty consign.
-// pub fn empty() -> Self {
-//   HashConsign { table: HashMap::new() }
-// }
+/// Thread safe version of the hash consed library.
+pub mod sync {
+  use std::fmt ;
+  use std::collections::HashMap ;
+  use std::sync::{ Arc, Mutex } ;  
+  use std::sync::mpsc::{ Sender, SendError } ;
+  pub use ::{ Hash, Hasher } ;
+  pub use ::{ UID, HashConsed } ;
 
-// /// Creates an empty consign with a capacity.
-// pub fn empty_with_capacity(capacity: usize) -> Self {
-//   HashConsign { table: HashMap::new_with_capacity(capacity) }
-// }
+  /**
+  Creates a thread safe hash consed type for some type.
+  */
+  #[macro_export]
+  macro_rules! sync_hash_cons {
+    ($id:ident for $t:ty) => (
+      type $id = ::std::sync::Arc<$crate::HashConsed<$t>> ;
+    ) ;
+    (pub $id:ident for $t:ty) => (
+      pub type $id = ::std::sync::Arc<$crate::HashConsed<$t>> ;
+    ) ;
+  }
 
-// /// Hash conses something and returns the hash consed version.
-// pub fn empty() -> Self {
-//   HashConsign { table: HashMap::new() }
-// }
-// fn mk(& mut self, elm: T) -> Rc<HashConsed<T>>
-// where HashConsed<T>: Sized {
-//   let hkey = elm.uid() ;
-//   let should_remove = match self.table.get(& hkey) {
-//     Some(consed) => match consed.upgrade() {
-//       Some(consed) => return consed,
-//       _ => true,
-//     },
-//     _ => false,
-//   } ;
-//   if should_remove { self.table.remove(& hkey) ; () } ;
-//   let consed = Rc::new(HashConsed{ elm: elm, hkey: hkey }) ;
-//   let wconsed = consed.downgrade() ;
-//   match self.table.insert(hkey, wconsed) {
-//     None => (),
-//     _ => panic!("unreachable"),
-//   } ;
-//   consed
-// }
 
-//   /// The number of elements stored, mostly for testing.
-//   pub fn len(& self) -> usize { self.table.len() }
-// }
+  unsafe impl<T> Sync for HashConsed<T> { }
+
+  /// Actual type stored and returnd by the sync consigned.
+  pub type HConsed<T> = Arc<HashConsed<T>> ;
+
+
+  /**
+  The consign storing the actual hash consed elements as `Rc`s. The hash map is
+  wrapped in a mutex for thread-safety.
+  */
+  pub struct HashConsign<T> where T: UID + Hash {
+    /// The actual hash consing table.
+    table: Mutex<HashMap<usize, HConsed<T>>>,
+  }
+
+  impl<T> HashConsign<T> where T: UID + Hash {
+    /// Creates an empty consign.
+    pub fn empty() -> Self {
+      HashConsign { table: Mutex::new(HashMap::new()) }
+    }
+
+    /// Creates an empty consign with a capacity.
+    pub fn empty_with_capacity(capacity: usize) -> Self {
+      HashConsign { table: Mutex::new(HashMap::with_capacity(capacity)) }
+    }
+
+    /// Hash conses something and returns the hash consed version.
+    consign_mk_fun!{ synced for T }
+
+    /// Sends a hash consed element through a send channel.
+    pub fn send(
+      & self, elm: & HConsed<T>, sender: & Sender<HConsed<T>>
+    ) -> Result<(), SendError<HConsed<T>>> {
+      sender.send(elm.clone())
+    }
+
+    /// The number of elements stored, mostly for testing.
+    pub fn len(& self) -> usize { self.table.lock().unwrap().len() }
+  }
+
+  unsafe impl<T> Sync for HashConsign<T> where T: UID + Hash { }
+
+  impl<T> fmt::Display for HashConsign<T> where T: UID + Hash + fmt::Display {
+    fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+      try!( write!(fmt, "consign:") ) ;
+      let table = self.table.lock().unwrap() ;
+      for (_, ref e) in table.iter() {
+        try!( write!(fmt, "\n  | {}", e) ) ;
+      }
+      Ok(())
+    }
+  }
+
+
+
+}
