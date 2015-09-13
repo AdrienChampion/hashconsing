@@ -12,8 +12,9 @@ Simple example for lambda calculus.
 #[macro_use]
 extern crate hashconsing as hc ;
 
+use std::rc::Rc ;
 use std::fmt ;
-use ::hc::* ;
+use hc::* ;
 
 
 use ::ActualTerm::* ;
@@ -71,6 +72,30 @@ impl TermFactory for HashConsign<ActualTerm> {
     self.mk( App(u, v) )
   }
 }
+
+
+fn main() {
+  let mut consign = HashConsign::empty() ;
+  assert_eq!(consign.len(), 0) ;
+
+  let v = consign.var(0) ;
+  assert_eq!(consign.len(), 1) ;
+
+  let v2 = consign.var(3) ;
+  assert_eq!(consign.len(), 2) ;
+
+  let lam = consign.lam(v2) ;
+  assert_eq!(consign.len(), 3) ;
+
+  let v3 = consign.var(3) ;
+  assert_eq!(consign.len(), 3) ;
+
+  let lam2 = consign.lam(v3) ;
+  assert_eq!(consign.len(), 3) ;
+
+  let app = consign.app(lam2, v) ;
+  assert_eq!(consign.len(), 4) ;
+}
 ```
 "]
 
@@ -84,16 +109,6 @@ use std::cmp::{
 
 /**
 Creates a hash consed type for some type.
-
-```
-hash_cons!{pub Term for ActualTerm}
-
-pub enum ActualTerm {
-  Var(usize),
-  Lam(Term),
-  App(Term, Term)
-}
-```
 **/
 #[macro_export]
 macro_rules! hash_cons {
