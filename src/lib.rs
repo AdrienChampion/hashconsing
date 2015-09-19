@@ -115,6 +115,14 @@ macro_rules! hash_cons {
 }
 
 /**
+Convenience macro to match hash consed things.
+*/
+#[macro_export]
+macro_rules! hc_match {
+  ($e:expr, $b) => (match $e.get() $b)
+}
+
+/**
 Creates the `mk` function on a consign used to hash cons elements. Used to
 factor the synced and unsynced versions.
 */
@@ -191,7 +199,7 @@ impl<T> Hash for HashConsed<T> {
 
 impl<T: fmt::Display> fmt::Display for HashConsed<T> {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    write!(fmt, "{}", self.elm)
+    self.elm.fmt(fmt)
   }
 }
 
@@ -235,7 +243,12 @@ impl<T> fmt::Display for HashConsign<T> where T: Hash + fmt::Display {
 
 
 /**
-Thread safe version of the hash consed library.
+Thread safe version of the hash consed library. The consign is wrapped in a
+mutex. The main difference for users is that hash cons operations now take
+a `& self` and note a `& mut self`.
+
+The idea is to share an `Arc` of the consign that threads use to create things.
+They can then be exchanged through channels for instance.
 
 # Example
 
