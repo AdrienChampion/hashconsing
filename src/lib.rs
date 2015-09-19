@@ -1,3 +1,12 @@
+// Copyright 2015 Adrien Champion. See the COPYRIGHT file at the top-level
+// directory of this distribution.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
+
 #![doc="
 Hash consing library. Ideally we'd like to use weak references in the consign
 but they're currently feature gated. Waiting for dust to settle.
