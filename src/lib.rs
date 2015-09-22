@@ -137,11 +137,13 @@ factor the synced and unsynced versions.
 */
 macro_rules! consign_mk_fun {
   (synced for $t:ty) => (
+    /// Hash conses something and returns the hash consed version.
     pub fn mk(& self, elm: $t) -> HConsed<$t> {
       consign_mk_fun!( self.table.lock().unwrap(), elm, Arc )
     }
   ) ;
   (unsynced for $t:ty) => (
+    /// Hash conses something and returns the hash consed version.
     pub fn mk(& mut self, elm: $t) -> HConsed<$t> {
       consign_mk_fun!( self.table, elm, Rc )
     }
@@ -179,7 +181,9 @@ pub struct HashConsed<T> {
 
 impl<T> HashConsed<T> {
   /// The element hash consed.
+  #[inline(always)]
   pub fn get(& self) -> & T { & self.elm }
+  #[inline(always)]
   /// The hash of the element.
   pub fn hkey(& self) -> u64 { self.hkey }
 }
@@ -223,19 +227,21 @@ pub struct HashConsign<T> where T: Hash {
 
 impl<T> HashConsign<T> where T: Hash {
   /// Creates an empty consign.
+  #[inline(always)]
   pub fn empty() -> Self {
     HashConsign { table: HashMap::new() }
   }
 
   /// Creates an empty consign with a capacity.
+  #[inline(always)]
   pub fn empty_with_capacity(capacity: usize) -> Self {
     HashConsign { table: HashMap::with_capacity(capacity) }
   }
 
-  /// Hash conses something and returns the hash consed version.
   consign_mk_fun!{ unsynced for T }
 
   /// The number of elements stored, mostly for testing.
+  #[inline(always)]
   pub fn len(& self) -> usize { self.table.len() }
 }
 
@@ -440,7 +446,7 @@ pub mod sync {
 
   unsafe impl<T> Sync for HashConsed<T> { }
 
-  /// Actual type stored and returnd by the sync consigned.
+  /// Actual type stored and returned by the sync consigned.
   pub type HConsed<T> = Arc<HashConsed<T>> ;
 
 
@@ -464,7 +470,6 @@ pub mod sync {
       HashConsign { table: Mutex::new(HashMap::with_capacity(capacity)) }
     }
 
-    /// Hash conses something and returns the hash consed version.
     consign_mk_fun!{ synced for T }
 
     /// Sends a hash consed element through a send channel.
