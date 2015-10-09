@@ -7,9 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[macro_use]
 extern crate hashconsing ;
-
 
 mod unsync {
   use std::fmt ;
@@ -18,10 +16,10 @@ mod unsync {
 
   use self::ActualTerm::* ;
 
-  hash_cons!{pub Term for ActualTerm}
+  type Term = HConsed<ActualTerm> ;
 
   #[derive(Hash)]
-  pub enum ActualTerm {
+  enum ActualTerm {
     Var(usize),
     Lam(Term),
     App(Term, Term)
@@ -52,7 +50,6 @@ mod unsync {
       }
     }
   }
-
 
   trait TermFactory {
     fn var(& mut self, v: usize) -> Term ;
@@ -114,17 +111,17 @@ mod unsync {
 
 mod sync {
   use std::thread ;
-  use std::sync::{ Arc, mpsc } ;
+  use std::sync::{ Arc, mpsc, Mutex } ;
   use std::fmt ;
 
-  use hashconsing::sync::* ;
+  use hashconsing::* ;
 
   use self::ActualTerm::* ;
 
-  sync_hash_cons!{pub Term for ActualTerm}
+  type Term = HConsed<ActualTerm> ;
 
   #[derive(Hash)]
-  pub enum ActualTerm {
+  enum ActualTerm {
     Var(usize),
     Lam(Term),
     App(Term, Term)
@@ -161,27 +158,29 @@ mod sync {
     fn var(& self, v: usize) -> Term ;
     fn lam(& self, t: Term) -> Term ;
     fn app(& self, u: Term, v: Term) -> Term ;
+    fn len(& self) -> usize ;
   }
 
 
-  impl TermFactory for HashConsign<ActualTerm> {
-    fn var(& self, v: usize) -> Term { self.mk( Var(v) ) }
-    fn lam(& self, t: Term) -> Term { self.mk( Lam(t) ) }
+  impl TermFactory for Arc<Mutex<HashConsign<ActualTerm>>> {
+    fn var(& self, v: usize) -> Term { self.lock().unwrap().mk( Var(v) ) }
+    fn lam(& self, t: Term) -> Term { self.lock().unwrap().mk( Lam(t) ) }
     fn app(& self, u: Term, v: Term) -> Term {
-      self.mk( App(u, v) )
+      self.lock().unwrap().mk( App(u, v) )
     }
+    fn len(& self) -> usize { self.lock().unwrap().len() }
   }
 
 
   pub fn run(silent: bool) {
     println!("\n|============================|\n|") ;
 
-    println!("| Unsynced\n|") ;
+    println!("| Synced\n|") ;
 
     let thread_count = 4 ;
     println!("| Running with {} threads\n|", thread_count) ;
 
-    let consign = Arc::new(HashConsign::empty()) ;
+    let consign = Arc::new( Mutex::new(HashConsign::empty()) ) ;
     assert_eq!(consign.len(), 0) ;
 
     // Master to slaves channel.
@@ -211,25 +210,25 @@ mod sync {
         if ! silent {
           println!("| {} | [{:>2}] lam = {}", i, consign.len(), lam)
         } ;
-        if i == 1 { consign.send(& lam, & ts).unwrap() ; () } ;
+        if i == 1 { ts.send(lam.clone()).unwrap() ; () } ;
 
         let v3 = consign.var(3) ;
         if ! silent {
           println!("| {} | [{:>2}] v3 = {}", i, consign.len(), v3)
         } ;
-        if i == 2 { consign.send(& v3, & ts).unwrap() ; () } ;
+        if i == 2 { ts.send(v3.clone()).unwrap() ; () } ;
 
         let lam2 = consign.lam(v3) ;
         if ! silent {
           println!("| {} | [{:>2}] lam2 = {}", i, consign.len(), lam2)
         } ;
-        if i == 3 { consign.send(& lam2, & ts).unwrap() ; () } ;
+        if i == 3 { ts.send(lam2.clone()).unwrap() ; () } ;
 
         let app = consign.app(lam2, v) ;
         if ! silent {
           println!("| {} | [{:>2}] app = {}", i, consign.len(), app)
         } ;
-        if i == 4 { consign.send(& app, & ts).unwrap() ; () } ;
+        if i == 4 { ts.send(app).unwrap() ; () } ;
 
         tx.send(i)
       }) ;
@@ -241,16 +240,16 @@ mod sync {
           bla = consign.app(t, bla) ;
           println!("| 0 | [{:>2}] app = {}", consign.len(), bla)
         },
-        Err(e) => println!("| Error {}.", e),
+        Err(e) => panic!("error {}.", e),
       }
       match rx.recv() {
         Ok(i) => println!("| Thread {} is done.", i),
-        Err(e) => println!("| Error {}.", e),
+        Err(e) => panic!("error {}.", e),
       }
     }
     assert_eq!(consign.len(), 7) ;
 
-    println!("|\n| {}", consign) ;
+    println!("|\n| {}", * consign.lock().unwrap()) ;
 
     println!("|\n|============================|\n") ;
   }

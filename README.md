@@ -10,7 +10,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hashconsing = "0.2.1"
+hashconsing = "0.3.0"
 ```
 
 and this to your crate root:
