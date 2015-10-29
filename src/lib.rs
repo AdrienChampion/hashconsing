@@ -264,6 +264,12 @@ impl<T> HConsed<T> {
   pub fn hkey(& self) -> u64 { self.hkey }
 }
 
+impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+    write!(fmt, "{:?}", self.elm)
+  }
+}
+
 impl<T> Clone for HConsed<T> {
   fn clone(& self) -> Self {
     HConsed { elm: self.elm.clone(), hkey: self.hkey }
