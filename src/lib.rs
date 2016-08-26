@@ -347,7 +347,7 @@ impl<T : Hash> HashConsign<T> {
 
   /** Hash conses something and returns the hash consed version. */
   pub fn mk(& mut self, elm: T) -> HConsed<T> {
-    let mut hasher = SipHasher::new() ;
+    let mut hasher = SipHasher::new_with_keys(0, 0) ;
     let hkey = {
       elm.hash(& mut hasher) ;
       hasher.finish()
