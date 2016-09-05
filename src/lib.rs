@@ -238,6 +238,7 @@ use std::fmt ;
 use std::sync::Arc ;
 use std::marker::{ Send, Sync } ;
 use std::collections::HashMap ;
+use std::collections::hash_map::Iter ;
 use std::hash::SipHasher ;
 use std::hash::{ Hash, Hasher } ;
 use std::cmp::{
@@ -246,20 +247,20 @@ use std::cmp::{
 use std::ops::Deref ;
 use std::clone::Clone ;
 
-/** Stores a hash consed element and its hash in order to avoid recomputing it
-  every time. */
+/// Stores a hash consed element and its hash in order to avoid recomputing it
+/// every time.
 pub struct HConsed<T> {
-  /** The actual element. */
+  /// The actual element.
   elm: Arc<T>,
-  /** The hash key of the element. */
+  /// The hash key of the element.
   hkey: u64,
 }
 
 impl<T> HConsed<T> {
-  /** The element hash consed. Can also be accessed via dereferencing. */
+  /// The element hash consed. Can also be accessed via dereferencing.
   #[inline(always)]
   pub fn get(& self) -> & T { self.elm.deref() }
-  /** The hash key of the element. */
+  /// The hash key of the element.
   #[inline(always)]
   pub fn hkey(& self) -> u64 { self.hkey }
 }
@@ -318,14 +319,14 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
   }
 }
 
-/** The consign storing the actual hash consed elements as `HConsed`s. */
+/// The consign storing the actual hash consed elements as `HConsed`s.
 pub struct HashConsign<T : Hash> {
-  /** The actual hash consing table. */
+  /// The actual hash consing table.
   table: HashMap<u64, HConsed<T>>,
 }
 
 impl<T : Hash> HashConsign<T> {
-  /** Creates an empty consign. */
+  /// Creates an empty consign.
   #[inline(always)]
   pub fn empty() -> Self {
     HashConsign {
@@ -333,7 +334,7 @@ impl<T : Hash> HashConsign<T> {
     }
   }
 
-  /** Creates an empty consign with a capacity. */
+  /// Creates an empty consign with a capacity.
   #[inline(always)]
   pub fn empty_with_capacity(capacity: usize) -> Self {
     HashConsign {
@@ -341,11 +342,17 @@ impl<T : Hash> HashConsign<T> {
     }
   }
 
-  /** The number of elements stored, mostly for testing. */
+  /// Iterator on the elements stored in the consign.
+  #[inline]
+  pub fn iter(& self) -> Iter<u64, HConsed<T>> {
+    self.table.iter()
+  }
+
+  /// The number of elements stored, mostly for testing.
   #[inline(always)]
   pub fn len(& self) -> usize { self.table.len() }
 
-  /** Hash conses something and returns the hash consed version. */
+  /// Hash conses something and returns the hash consed version.
   pub fn mk(& mut self, elm: T) -> HConsed<T> {
     let mut hasher = SipHasher::new() ;
     let hkey = {
