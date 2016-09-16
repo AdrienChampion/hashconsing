@@ -237,6 +237,7 @@ pub fn main() {
 use std::fmt ;
 use std::sync::Arc ;
 use std::marker::{ Send, Sync } ;
+use std::default::Default ;
 use std::collections::HashMap ;
 use std::collections::hash_map::Iter ;
 use std::hash::SipHasher ;
@@ -320,25 +321,33 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HashConsign<T : Hash> {
+pub struct HashConsign<
+  T : Hash, H: Hasher + Default + Clone = SipHasher
+> {
   /// The actual hash consing table.
   table: HashMap<u64, HConsed<T>>,
+  /// Phantom hasher.
+  hasher: H,
 }
 
-impl<T : Hash> HashConsign<T> {
+impl<
+  T : Hash, H: Hasher + Default + Clone
+> HashConsign<T, H> {
   /// Creates an empty consign.
   #[inline(always)]
   pub fn empty() -> Self {
     HashConsign {
       table: HashMap::new(),
+      hasher: H::default(),
     }
   }
 
   /// Creates an empty consign with a capacity.
   #[inline(always)]
-  pub fn empty_with_capacity(capacity: usize) -> Self {
+  pub fn with_capacity(capacity: usize) -> Self {
     HashConsign {
       table: HashMap::with_capacity(capacity),
+      hasher: H::default(),
     }
   }
 
@@ -354,7 +363,7 @@ impl<T : Hash> HashConsign<T> {
 
   /// Hash conses something and returns the hash consed version.
   pub fn mk(& mut self, elm: T) -> HConsed<T> {
-    let mut hasher = SipHasher::new() ;
+    let mut hasher = self.hasher.clone() ;
     let hkey = {
       elm.hash(& mut hasher) ;
       hasher.finish()

@@ -13,3 +13,6 @@ license = "MIT/Apache-2.0"
 [[bin]]
 name = "hashconsing_bin"
 doc = false
+
+[dependencies]
+fnv = "1.0.4"
