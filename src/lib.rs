@@ -235,7 +235,7 @@ pub fn main() {
 */
 
 use std::fmt ;
-use std::sync::Arc ;
+use std::sync::{ RwLock, Arc } ;
 use std::marker::{ Send, Sync } ;
 use std::default::Default ;
 use std::collections::HashMap ;
@@ -322,7 +322,7 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
 pub struct HashConsign<
-  T : Hash, H: Hasher + Default + Clone = SipHasher
+  T : Hash, H: Hasher = SipHasher
 > {
   /// The actual hash consing table.
   table: HashMap<u64, HConsed<T>>,
@@ -361,23 +361,19 @@ impl<
   #[inline(always)]
   pub fn len(& self) -> usize { self.table.len() }
 
-  /// Hash conses something and returns the hash consed version.
-  pub fn mk(& mut self, elm: T) -> HConsed<T> {
+  /// Hash of an element.
+  #[inline(always)]
+  fn hash(& self, elm: & T) -> u64 {
     let mut hasher = self.hasher.clone() ;
-    let hkey = {
-      elm.hash(& mut hasher) ;
-      hasher.finish()
-    } ;
-    // If the element is known return it.
-    if let Some(consed) = self.table.get(& hkey) { return consed.clone() } ;
-    // Otherwise build the hash consed version...
-    let consed = HConsed { elm: Arc::new(elm), hkey: hkey } ;
-    // ...add it to the table...
-    match self.table.insert(hkey, consed.clone()) {
-      None => (), _ => unreachable!(),
-    } ;
-    // ...and return it.
-    consed
+    elm.hash(& mut hasher) ;
+    hasher.finish()
+  }
+
+  /// Inserts in the consign.
+  #[inline(always)]
+  fn insert(& mut self, hkey: u64, consed: HConsed<T>) {
+    let prev = self.table.insert(hkey, consed) ;
+    debug_assert!( prev.is_none() )
   }
 }
 
@@ -389,5 +385,48 @@ where T: Hash + fmt::Display {
       try!( write!(fmt, "\n  | {}", e) ) ;
     }
     Ok(())
+  }
+}
+
+
+/// HConsed element creation.
+pub trait HConser<T: Hash> {
+  /// Creates a HConsed element.
+  fn mk(self, elm: T) -> HConsed<T> ;
+}
+impl<
+  'a, T: Hash, H: Hasher + Default + Clone
+> HConser<T> for & 'a mut HashConsign<T, H> {
+  /// Hash conses something and returns the hash consed version.
+  fn mk(self, elm: T) -> HConsed<T> {
+    let hkey = self.hash(& elm) ;
+    // If the element is known return it.
+    if let Some(consed) = self.table.get(& hkey) { return consed.clone() } ;
+    // Otherwise build the hash consed version...
+    let consed = HConsed { elm: Arc::new(elm), hkey: hkey } ;
+    // ...add it to the table...
+    self.insert(hkey, consed.clone()) ;
+    // ...and return it.
+    consed
+  }
+}
+impl<
+  'a, T: Hash, H: Hasher + Default + Clone
+> HConser<T> for & 'a RwLock< HashConsign<T, H> > {
+  /// Hash conses something and returns the hash consed version.
+  fn mk(self, elm: T) -> HConsed<T> {
+    let hkey = {
+      let slf = self.read().unwrap() ;
+      let hkey = slf.hash(& elm) ;
+      // If the element is known return it.
+      if let Some(consed) = slf.table.get(& hkey) { return consed.clone() } ;
+      hkey
+    } ;
+    // Otherwise build the hash consed version...
+    let consed = HConsed { elm: Arc::new(elm), hkey: hkey } ;
+    // ...add it to the table...
+    self.write().unwrap().insert(hkey, consed.clone()) ;
+    // ...and return it.
+    consed
   }
 }
