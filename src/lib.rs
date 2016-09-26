@@ -111,126 +111,6 @@ pub fn main() {
 }
 ```
 
-## Concurrent version
-
-```
-extern crate hashconsing ;
-
-use std::thread ;
-use std::sync::{ Arc, mpsc, Mutex } ;
-use std::fmt ;
-
-use hashconsing::* ;
-
-use self::ActualTerm::* ;
-
-type Term = HConsed<ActualTerm> ;
-
-#[derive(Hash)]
-enum ActualTerm {
-  Var(usize),
-  Lam(Term),
-  App(Term, Term)
-}
-
-impl PartialEq for ActualTerm {
-  fn eq(& self, rhs: & Self) -> bool {
-    match (self, rhs) {
-      (& Var(i), & Var(j)) =>
-        i == j,
-      (& Lam(ref t1), & Lam(ref t2)) =>
-        t1.hkey() == t2.hkey(),
-      (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-        u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
-      _ => false
-    }
-  }
-}
-impl Eq for ActualTerm {}
-
-
-impl fmt::Display for ActualTerm {
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    match self {
-      & Var(i) => write!(fmt, "v{}", i),
-      & Lam(ref t) => write!(fmt, "({})", t.get()),
-      & App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
-    }
-  }
-}
-
-
-trait TermFactory {
-  fn var(& self, v: usize) -> Term ;
-  fn lam(& self, t: Term) -> Term ;
-  fn app(& self, u: Term, v: Term) -> Term ;
-  fn len(& self) -> usize ;
-}
-
-
-impl TermFactory for Arc<Mutex<HashConsign<ActualTerm>>> {
-  fn var(& self, v: usize) -> Term { self.lock().unwrap().mk( Var(v) ) }
-  fn lam(& self, t: Term) -> Term { self.lock().unwrap().mk( Lam(t) ) }
-  fn app(& self, u: Term, v: Term) -> Term {
-    self.lock().unwrap().mk( App(u, v) )
-  }
-  fn len(& self) -> usize { self.lock().unwrap().len() }
-}
-
-
-pub fn main() {
-  let thread_count = 4 ;
-
-  let consign = Arc::new( Mutex::new(HashConsign::empty()) ) ;
-  assert_eq!(consign.len(), 0) ;
-
-  // Master to slaves channel.
-  let (tx, rx) = mpsc::channel() ;
-  // Slave to slave channel.
-  let (ts, rs) = mpsc::channel() ;
-
-  let mut bla = consign.var(0) ;
-
-  for i in 1..(thread_count + 1) {
-    let (consign, tx) = (consign.clone(), tx.clone()) ;
-    let ts = ts.clone() ;
-
-    thread::spawn(move || {
-
-      let v = consign.var(0) ;
-
-      let v2 = consign.var(3) ;
-
-      let lam = consign.lam(v2) ;
-      if i == 1 { ts.send(lam.clone()).unwrap() ; () } ;
-
-      let v3 = consign.var(3) ;
-      if i == 2 { ts.send(v3.clone()).unwrap() ; () } ;
-
-      let lam2 = consign.lam(v3) ;
-      if i == 3 { ts.send(lam2.clone()).unwrap() ; () } ;
-
-      let app = consign.app(lam2, v) ;
-      if i == 4 { ts.send(app).unwrap() ; () } ;
-
-      tx.send(i)
-    }) ;
-  }
-
-  for _ in 0..thread_count {
-    match rs.recv() {
-      Ok(t) => bla = consign.app(t, bla),
-      Err(e) => panic!("error {}.", e),
-    }
-    match rx.recv() {
-      Ok(i) => println!("| Thread {} is done.", i),
-      Err(e) => panic!("error {}.", e),
-    }
-  }
-  assert_eq!(consign.len(), 7) ;
-}
-```
-
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Type-safe modular hash-consing)
 */
 
@@ -255,6 +135,8 @@ pub struct HConsed<T> {
   elm: Arc<T>,
   /// The hash key of the element.
   hkey: u64,
+  /// Unique identifier of the element.
+  uid: u64,
 }
 
 impl<T> HConsed<T> {
@@ -264,6 +146,9 @@ impl<T> HConsed<T> {
   /// The hash key of the element.
   #[inline(always)]
   pub fn hkey(& self) -> u64 { self.hkey }
+  /// The hash key of the element.
+  #[inline(always)]
+  pub fn uid(& self) -> u64 { self.uid }
 }
 
 impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
@@ -274,27 +159,31 @@ impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
 
 impl<T> Clone for HConsed<T> {
   fn clone(& self) -> Self {
-    HConsed { elm: self.elm.clone(), hkey: self.hkey }
+    HConsed {
+      elm: self.elm.clone(),
+      hkey: self.hkey,
+      uid: self.uid,
+    }
   }
 }
 
 impl<T> PartialEq for HConsed<T> {
   #[inline(always)]
   fn eq(& self, rhs: & Self) -> bool {
-    self.hkey == rhs.hkey
+    self.uid == rhs.uid
   }
 }
 impl<T> Eq for HConsed<T> {}
 impl<T> PartialOrd for HConsed<T> {
   #[inline(always)]
   fn partial_cmp(& self, other: & Self) -> Option<Ordering> {
-    self.hkey.partial_cmp(& other.hkey)
+    self.uid.partial_cmp(& other.uid)
   }
 }
 impl<T> Ord for HConsed<T> {
   #[inline(always)]
   fn cmp(& self, other: & Self) -> Ordering {
-    self.hkey.cmp(& other.hkey)
+    self.uid.cmp(& other.uid)
   }
 }
 impl<T> Hash for HConsed<T> {
@@ -326,7 +215,9 @@ pub struct HashConsign<
 > {
   /// The actual hash consing table.
   table: HashMap<u64, HConsed<T>>,
-  /// Phantom hasher.
+  /// Counter for uids.
+  count: u64,
+  /// Hasher.
   hasher: H,
 }
 
@@ -338,6 +229,7 @@ impl<
   pub fn empty() -> Self {
     HashConsign {
       table: HashMap::new(),
+      count: 0,
       hasher: H::default(),
     }
   }
@@ -347,6 +239,7 @@ impl<
   pub fn with_capacity(capacity: usize) -> Self {
     HashConsign {
       table: HashMap::with_capacity(capacity),
+      count: 0,
       hasher: H::default(),
     }
   }
@@ -403,7 +296,11 @@ impl<
     // If the element is known return it.
     if let Some(consed) = self.table.get(& hkey) { return consed.clone() } ;
     // Otherwise build the hash consed version...
-    let consed = HConsed { elm: Arc::new(elm), hkey: hkey } ;
+    let uid = self.count ;
+    self.count += 1 ;
+    let consed = HConsed {
+      elm: Arc::new(elm), hkey: hkey, uid: uid
+    } ;
     // ...add it to the table...
     self.insert(hkey, consed.clone()) ;
     // ...and return it.
@@ -423,9 +320,14 @@ impl<
       hkey
     } ;
     // Otherwise build the hash consed version...
-    let consed = HConsed { elm: Arc::new(elm), hkey: hkey } ;
+    let mut conser = self.write().unwrap() ;
+    let uid = conser.count ;
+    conser.count += 1 ;
+    let consed = HConsed {
+      elm: Arc::new(elm), hkey: hkey, uid: uid
+    } ;
     // ...add it to the table...
-    self.write().unwrap().insert(hkey, consed.clone()) ;
+    conser.insert(hkey, consed.clone()) ;
     // ...and return it.
     consed
   }
