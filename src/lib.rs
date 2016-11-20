@@ -119,14 +119,13 @@ use std::sync::{ RwLock, Arc } ;
 use std::marker::{ Send, Sync } ;
 use std::default::Default ;
 use std::collections::HashMap ;
-use std::collections::hash_map::Iter ;
-use std::hash::SipHasher ;
+use std::collections::hash_map::{ Iter, DefaultHasher } ;
 use std::hash::{ Hash, Hasher } ;
 use std::cmp::{
   PartialEq, Eq, PartialOrd, Ord, Ordering
 } ;
 use std::ops::Deref ;
-use std::clone::Clone ;
+use std::marker::PhantomData ;
 
 /// Stores a hash consed element and its hash in order to avoid recomputing it
 /// every time.
@@ -211,18 +210,18 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
 pub struct HashConsign<
-  T : Hash, H: Hasher = SipHasher
+  T : Hash, H: Hasher = DefaultHasher
 > {
   /// The actual hash consing table.
   table: HashMap<u64, HConsed<T>>,
   /// Counter for uids.
   count: u64,
   /// Hasher.
-  hasher: H,
+  hasher: PhantomData<H>,
 }
 
 impl<
-  T : Hash, H: Hasher + Default + Clone
+  T : Hash, H: Hasher + Default
 > HashConsign<T, H> {
   /// Creates an empty consign.
   #[inline(always)]
@@ -230,7 +229,7 @@ impl<
     HashConsign {
       table: HashMap::new(),
       count: 0,
-      hasher: H::default(),
+      hasher: PhantomData,
     }
   }
 
@@ -240,7 +239,7 @@ impl<
     HashConsign {
       table: HashMap::with_capacity(capacity),
       count: 0,
-      hasher: H::default(),
+      hasher: PhantomData,
     }
   }
 
@@ -257,7 +256,7 @@ impl<
   /// Hash of an element.
   #[inline(always)]
   fn hash(& self, elm: & T) -> u64 {
-    let mut hasher = self.hasher.clone() ;
+    let mut hasher = H::default() ;
     elm.hash(& mut hasher) ;
     hasher.finish()
   }
@@ -288,7 +287,7 @@ pub trait HConser<T: Hash> {
   fn mk(self, elm: T) -> HConsed<T> ;
 }
 impl<
-  'a, T: Hash, H: Hasher + Default + Clone
+  'a, T: Hash, H: Hasher + Default
 > HConser<T> for & 'a mut HashConsign<T, H> {
   /// Hash conses something and returns the hash consed version.
   fn mk(self, elm: T) -> HConsed<T> {
