@@ -1,6 +1,6 @@
 # `hashconsing`
 
-[![Build Status](https://travis-ci.org/AdrienChampion/hashconsing.svg?branch=master)](https://travis-ci.org/AdrienChampion/hashconsing) [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2)
+[![Build Status](https://travis-ci.org/AdrienChampion/hashconsing.svg?branch=master)](https://travis-ci.org/AdrienChampion/hashconsing) [![Latest Version](https://img.shields.io/crates/v/hashconsing.svg)](https://crates.io/crates/hashconsing)
 
 `hashconsing` is a hash consing library in Rust.
 
@@ -10,20 +10,9 @@ built structure.
 
 For more details see [the documentation](doc).
 
-## Usage
+# License
 
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-hashconsing = "0.5.0"
-```
-
-and this to your crate root:
-
-```rust
-extern crate hashconsing ;
-```
+MIT/Apache-2.0
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Conchon et al.)
 [doc]: https://docs.rs/hashconsing (hashconsing documentation)
