@@ -336,6 +336,9 @@ impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
   fn mk(self, elm: T) -> HConsed<T> {
     // If the element is known and upgradable return it.
     if let Some(hconsed) = self.get(& elm) {
+      debug_assert!(
+        * hconsed.elm == elm
+      ) ;
       return hconsed.clone()
     }
     // Otherwise build hconsed version.
@@ -364,6 +367,9 @@ impl<
       let slf = self.read().unwrap() ;
       // If the element is known and upgradable return it.
       if let Some(hconsed) = slf.get(& elm) {
+        debug_assert!(
+          * hconsed.elm == elm
+        ) ;
         return hconsed.clone()
       }
     } ;
