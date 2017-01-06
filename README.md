@@ -1,6 +1,12 @@
+# `hashconsing`
+
+[![Build Status](https://travis-ci.org/AdrienChampion/hashconsing.svg?branch=master)](https://travis-ci.org/AdrienChampion/hashconsing) [![Latest Version](https://img.shields.io/crates/v/rsmt2.svg)](https://crates.io/crates/rsmt2)
+
 `hashconsing` is a hash consing library in Rust.
 
-It is a rather straightforward implementation of [a paper by Filiâtre and Conchon](paper).
+It is a based on [Type-Safe Modular Hash-Consing](paper) by Filiâtre and
+Conchon. It is slightly less efficient as uses Rust's `HashMap`s, not a custom
+built structure.
 
 For more details see [the documentation](doc).
 
@@ -10,15 +16,14 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-hashconsing = "0.3.0"
+hashconsing = "0.5.0"
 ```
 
 and this to your crate root:
 
 ```rust
-#[macro_use] // Optional, if you want to use the macros.
-extern crate hashconsing;
+extern crate hashconsing ;
 ```
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Conchon et al.)
-[doc]: http://adrienchampion.bitbucket.org/hashconsing/hashconsing/ (hashconsing documentation)
+[doc]: https://docs.rs/hashconsing (hashconsing documentation)

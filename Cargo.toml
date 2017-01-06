@@ -1,15 +1,11 @@
 [package]
 name = "hashconsing"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "A hash consing library."
-documentation = "http://adrienchampion.bitbucket.org/hashconsing/hashconsing/"
-homepage = "https://bitbucket.org/AdrienChampion/hashconsing/"
-repository = "https://bitbucket.org/AdrienChampion/hashconsing/src"
+documentation = "https://docs.rs/hashconsing"
+homepage = "https://github.com/AdrienChampion/hashconsing"
+repository = "https://github.com/AdrienChampion/hashconsing"
 readme = "README.md"
-keywords = ["hash", "consing", "sharing"]
+keywords = ["hashconsing", "hash", "consing", "sharing"]
 license = "MIT/Apache-2.0"
-
-[[bin]]
-name = "hashconsing_bin"
-doc = false

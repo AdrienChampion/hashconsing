@@ -9,20 +9,19 @@
 
 /*! Hash consing library.
 
-Straightforward implementation of the [paper by Filiâtre and Conchon][paper].
+It is a based on [Type-Safe Modular Hash-Consing](paper) by Filiâtre and
+Conchon. It is slightly less efficient as uses Rust's `HashMap`s, not a custom
+built structure.
 
 Provides constant time comparison and perfect (maximal) sharing assuming only
-one `HashConsign` is created for a given type. This assumption **must never**
-be falsified unless you really know what you are doing.
+one `HashConsign` is created for a given type. This assumption **must never be
+falsified** unless you really, **really** know what you are doing.
 
 Hash consed elements are immutable and therefore thread-safe: `HConsed`
 implements `Send` and `Sync`.
 
-
-## TODO
-
-Ideally we'd like to use weak references in the consign but they're currently
-feature-gated. Waiting for dust to settle.
+The consign actually stores weak references to values. This ensures that values
+are dropped once they are not used anymore.
 
 # Example
 
@@ -39,27 +38,12 @@ use self::ActualTerm::* ;
 
 type Term = HConsed<ActualTerm> ;
 
-#[derive(Hash)]
+#[derive(Hash, Clone, PartialEq, Eq)]
 enum ActualTerm {
   Var(usize),
   Lam(Term),
   App(Term, Term)
 }
-
-impl PartialEq for ActualTerm {
-  fn eq(& self, rhs: & Self) -> bool {
-    match (self, rhs) {
-      (& Var(i), & Var(j)) =>
-        i == j,
-      (& Lam(ref t1), & Lam(ref t2)) =>
-        t1.hkey() == t2.hkey(),
-      (& App(ref u1, ref v1), & App(ref u2, ref v2)) =>
-        u1.hkey() == u2.hkey() && v1.hkey() == v2.hkey(),
-      _ => false
-    }
-  }
-}
-impl Eq for ActualTerm {}
 
 
 impl fmt::Display for ActualTerm {
@@ -115,25 +99,20 @@ pub fn main() {
 */
 
 use std::fmt ;
-use std::sync::{ RwLock, Arc } ;
+use std::sync::{ RwLock, Arc, Weak } ;
 use std::marker::{ Send, Sync } ;
-use std::default::Default ;
 use std::collections::HashMap ;
-use std::collections::hash_map::{ Iter, DefaultHasher } ;
 use std::hash::{ Hash, Hasher } ;
 use std::cmp::{
   PartialEq, Eq, PartialOrd, Ord, Ordering
 } ;
 use std::ops::Deref ;
-use std::marker::PhantomData ;
 
 /// Stores a hash consed element and its hash in order to avoid recomputing it
 /// every time.
 pub struct HConsed<T> {
   /// The actual element.
   elm: Arc<T>,
-  /// The hash key of the element.
-  hkey: u64,
   /// Unique identifier of the element.
   uid: u64,
 }
@@ -144,10 +123,14 @@ impl<T> HConsed<T> {
   pub fn get(& self) -> & T { self.elm.deref() }
   /// The hash key of the element.
   #[inline(always)]
-  pub fn hkey(& self) -> u64 { self.hkey }
-  /// The hash key of the element.
-  #[inline(always)]
   pub fn uid(& self) -> u64 { self.uid }
+  /// Turns a hashconsed thing in a weak hashconsed thing.
+  #[inline(always)]
+  fn to_weak(& self) -> WHConsed<T> {
+    WHConsed {
+      elm: Arc::downgrade(& self.elm), uid: self.uid
+    }
+  }
 }
 
 impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
@@ -160,7 +143,6 @@ impl<T> Clone for HConsed<T> {
   fn clone(& self) -> Self {
     HConsed {
       elm: self.elm.clone(),
-      hkey: self.hkey,
       uid: self.uid,
     }
   }
@@ -185,10 +167,10 @@ impl<T> Ord for HConsed<T> {
     self.uid.cmp(& other.uid)
   }
 }
-impl<T> Hash for HConsed<T> {
+impl<T: Hash> Hash for HConsed<T> {
   #[inline(always)]
   fn hash<H>(& self, state: & mut H) where H: Hasher {
-    self.hkey.hash(state)
+    self.uid.hash(state)
   }
 }
 
@@ -208,28 +190,77 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
   }
 }
 
-/// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HashConsign<
-  T : Hash, H: Hasher = DefaultHasher
-> {
-  /// The actual hash consing table.
-  table: HashMap<u64, HConsed<T>>,
-  /// Counter for uids.
-  count: u64,
-  /// Hasher.
-  hasher: PhantomData<H>,
+/// Weak version of `HConsed` (internal).
+struct WHConsed<T> {
+  /// The actual element.
+  elm: Weak<T>,
+  /// Unique identifier of the element.
+  uid: u64,
+}
+impl<T> WHConsed<T> {
+  /// Turns a weak hashconsed thing in a hashconsed thing.
+  pub fn to_hconsed(& self) -> Option<HConsed<T>> {
+    if let Some(arc) = self.elm.upgrade() {
+      Some(
+        HConsed {
+          elm: arc, uid: self.uid
+        }
+      )
+    } else { None }
+  }
 }
 
-impl<
-  T : Hash, H: Hasher + Default
-> HashConsign<T, H> {
+impl<T: fmt::Display> fmt::Display for WHConsed<T> {
+  #[inline(always)]
+  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+    if let Some(arc) = self.elm.upgrade() { arc.fmt(fmt) } else {
+      write!(fmt, "<freed>")
+    }
+  }
+}
+
+impl<T> Hash for WHConsed<T> {
+  #[inline(always)]
+  fn hash<H>(& self, state: & mut H) where H: Hasher {
+    self.uid.hash(state)
+  }
+}
+
+impl<T> PartialEq for WHConsed<T> {
+  #[inline(always)]
+  fn eq(& self, rhs: & Self) -> bool {
+    self.uid == rhs.uid
+  }
+}
+impl<T> Eq for WHConsed<T> {}
+impl<T> PartialOrd for WHConsed<T> {
+  #[inline(always)]
+  fn partial_cmp(& self, other: & Self) -> Option<Ordering> {
+    self.uid.partial_cmp(& other.uid)
+  }
+}
+impl<T> Ord for WHConsed<T> {
+  #[inline(always)]
+  fn cmp(& self, other: & Self) -> Ordering {
+    self.uid.cmp(& other.uid)
+  }
+}
+
+/// The consign storing the actual hash consed elements as `HConsed`s.
+pub struct HashConsign<T : Hash + Eq + Clone> {
+  /// The actual hash consing table.
+  table: HashMap<T, WHConsed<T>>,
+  /// Counter for uids.
+  count: u64,
+}
+
+impl<T : Hash + Eq + Clone> HashConsign<T> {
   /// Creates an empty consign.
   #[inline(always)]
   pub fn empty() -> Self {
     HashConsign {
       table: HashMap::new(),
       count: 0,
-      hasher: PhantomData,
     }
   }
 
@@ -239,37 +270,52 @@ impl<
     HashConsign {
       table: HashMap::with_capacity(capacity),
       count: 0,
-      hasher: PhantomData,
     }
   }
 
-  /// Iterator on the elements stored in the consign.
+  /// Fold on the elements stored in the consign.
   #[inline]
-  pub fn iter(& self) -> Iter<u64, HConsed<T>> {
-    self.table.iter()
+  pub fn fold<Acc, F>(& self, f: F, mut init: Acc) -> Acc
+  where F : Fn(Acc, HConsed<T>) -> Acc {
+    for (_, weak) in self.table.iter() {
+      if let Some(consed) = weak.to_hconsed() {
+        init = f(init, consed)
+      }
+    }
+    init
   }
 
   /// The number of elements stored, mostly for testing.
   #[inline(always)]
   pub fn len(& self) -> usize { self.table.len() }
 
-  /// Hash of an element.
-  #[inline(always)]
-  fn hash(& self, elm: & T) -> u64 {
-    let mut hasher = H::default() ;
-    elm.hash(& mut hasher) ;
-    hasher.finish()
+  /// Inserts in the consign.
+  ///
+  /// One of the following must hold:
+  ///
+  /// - `self.table` is not defined at `key`
+  /// - the weak ref in `self.table` at `key` returns `None` when upgraded.
+  ///
+  /// This is checked in `debug` but not `release`.
+  #[inline]
+  fn insert(& mut self, key: T, wconsed: WHConsed<T>) {
+    let prev = self.table.insert(key, wconsed) ;
+    debug_assert!(
+      match prev {
+        None => true,
+        Some(prev) => prev.to_hconsed().is_none(),
+      }
+    )
   }
 
-  /// Inserts in the consign.
-  #[inline(always)]
-  fn insert(& mut self, hkey: u64, consed: HConsed<T>) {
-    let prev = self.table.insert(hkey, consed) ;
-    debug_assert!( prev.is_none() )
+  /// Attempts to retrieve an *upgradable* value from the map.
+  #[inline]
+  fn get(& self, key: & T) -> Option<HConsed<T>> {
+    self.table.get(key).and_then(|old| old.to_hconsed())
   }
 }
 
-impl<T> fmt::Display for HashConsign<T>
+impl<T: Hash + Eq + Clone> fmt::Display for HashConsign<T>
 where T: Hash + fmt::Display {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     try!( write!(fmt, "consign:") ) ;
@@ -286,48 +332,54 @@ pub trait HConser<T: Hash> {
   /// Creates a HConsed element.
   fn mk(self, elm: T) -> HConsed<T> ;
 }
-impl<
-  'a, T: Hash, H: Hasher + Default
-> HConser<T> for & 'a mut HashConsign<T, H> {
+impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
   /// Hash conses something and returns the hash consed version.
   fn mk(self, elm: T) -> HConsed<T> {
-    let hkey = self.hash(& elm) ;
-    // If the element is known return it.
-    if let Some(consed) = self.table.get(& hkey) { return consed.clone() } ;
-    // Otherwise build the hash consed version...
-    let uid = self.count ;
-    self.count += 1 ;
-    let consed = HConsed {
-      elm: Arc::new(elm), hkey: hkey, uid: uid
+    // If the element is known and upgradable return it.
+    if let Some(hconsed) = self.get(& elm) {
+      return hconsed.clone()
+    }
+    // Otherwise build hconsed version.
+    let hconsed = HConsed {
+      elm: Arc::new( elm.clone() ),
+      uid: self.count,
     } ;
-    // ...add it to the table...
-    self.insert(hkey, consed.clone()) ;
-    // ...and return it.
-    consed
+    // Increment uid count.
+    self.count += 1 ;
+    // ...add weak version to the table...
+    self.insert(elm, hconsed.to_weak()) ;
+    // ...and return consed version.
+    hconsed
   }
 }
 impl<
-  'a, T: Hash, H: Hasher + Default + Clone
-> HConser<T> for & 'a RwLock< HashConsign<T, H> > {
+  'a, T: Hash + Eq + Clone
+> HConser<T> for & 'a RwLock< HashConsign<T> > {
   /// Hash conses something and returns the hash consed version.
+  ///
+  /// If the element is already in the consign, only read access will be
+  /// requested.
   fn mk(self, elm: T) -> HConsed<T> {
-    let hkey = {
+    // Request read and check if element already exists.
+    {
       let slf = self.read().unwrap() ;
-      let hkey = slf.hash(& elm) ;
-      // If the element is known return it.
-      if let Some(consed) = slf.table.get(& hkey) { return consed.clone() } ;
-      hkey
+      // If the element is known and upgradable return it.
+      if let Some(hconsed) = slf.get(& elm) {
+        return hconsed.clone()
+      }
     } ;
-    // Otherwise build the hash consed version...
-    let mut conser = self.write().unwrap() ;
-    let uid = conser.count ;
-    conser.count += 1 ;
-    let consed = HConsed {
-      elm: Arc::new(elm), hkey: hkey, uid: uid
+    // Otherwise insert.
+    let mut slf = self.write().unwrap() ;
+    // Otherwise build hconsed version.
+    let hconsed = HConsed {
+      elm: Arc::new( elm.clone() ),
+      uid: slf.count,
     } ;
-    // ...add it to the table...
-    conser.insert(hkey, consed.clone()) ;
-    // ...and return it.
-    consed
+    // Increment uid count.
+    slf.count += 1 ;
+    // ...add weak version to the table...
+    slf.insert(elm, hconsed.to_weak()) ;
+    // ...and return consed version.
+    hconsed
   }
 }
