@@ -10,9 +10,14 @@ built structure.
 
 For more details see [the documentation](doc).
 
+# Known projects using `hashconsing`
+
+- [kinō][kino], a model-checker for transition systems.
+
 # License
 
 MIT/Apache-2.0
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Conchon et al.)
 [doc]: https://docs.rs/hashconsing (hashconsing documentation)
+[kino]: https://github.com/kino-mc/kino (kino)

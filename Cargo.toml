@@ -1,11 +1,15 @@
 [package]
 name = "hashconsing"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "A hash consing library."
 documentation = "https://docs.rs/hashconsing"
 homepage = "https://github.com/AdrienChampion/hashconsing"
 repository = "https://github.com/AdrienChampion/hashconsing"
 readme = "README.md"
-keywords = ["hashconsing", "hash", "consing", "sharing"]
+categories = ["caching", "concurrency", "memory-management", ]
+keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
+
+[badges]
+travis-ci = { repository = "AdrienChampion/hashconsing" }

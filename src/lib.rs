@@ -120,7 +120,7 @@ impl<T> HConsed<T> {
   /// The element hash consed. Can also be accessed via dereferencing.
   #[inline(always)]
   pub fn get(& self) -> & T { self.elm.deref() }
-  /// The hash key of the element.
+  /// The unique identifier of the element.
   #[inline(always)]
   pub fn uid(& self) -> u64 { self.uid }
   /// Turns a hashconsed thing in a weak hashconsed thing.
