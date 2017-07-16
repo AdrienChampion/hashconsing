@@ -327,19 +327,23 @@ where T: Hash + fmt::Display {
 
 
 /// HConsed element creation.
-pub trait HConser<T: Hash> {
+pub trait HConser<T: Hash>: Sized {
+  /// Creates a HConsed element. Returns true iff the element is new.
+  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) ;
   /// Creates a HConsed element.
-  fn mk(self, elm: T) -> HConsed<T> ;
+  fn mk(self, elm: T) -> HConsed<T> {
+    self.mk_is_new(elm).0
+  }
 }
 impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
   /// Hash conses something and returns the hash consed version.
-  fn mk(self, elm: T) -> HConsed<T> {
+  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
     // If the element is known and upgradable return it.
     if let Some(hconsed) = self.get(& elm) {
       debug_assert!(
         * hconsed.elm == elm
       ) ;
-      return hconsed.clone()
+      return (hconsed.clone(), false)
     }
     // Otherwise build hconsed version.
     let hconsed = HConsed {
@@ -351,7 +355,7 @@ impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
     // ...add weak version to the table...
     self.insert(elm, hconsed.to_weak()) ;
     // ...and return consed version.
-    hconsed
+    (hconsed, true)
   }
 }
 impl<
@@ -361,7 +365,7 @@ impl<
   ///
   /// If the element is already in the consign, only read access will be
   /// requested.
-  fn mk(self, elm: T) -> HConsed<T> {
+  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
     // Request read and check if element already exists.
     {
       let slf = self.read().unwrap() ;
@@ -370,7 +374,7 @@ impl<
         debug_assert!(
           * hconsed.elm == elm
         ) ;
-        return hconsed.clone()
+        return (hconsed.clone(), false)
       }
     } ;
     // Otherwise insert.
@@ -385,6 +389,6 @@ impl<
     // ...add weak version to the table...
     slf.insert(elm, hconsed.to_weak()) ;
     // ...and return consed version.
-    hconsed
+    (hconsed, true)
   }
 }
