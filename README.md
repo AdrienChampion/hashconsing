@@ -12,7 +12,8 @@ For more details see [the documentation](doc).
 
 # Known projects using `hashconsing`
 
-- [kinō][kino], a model-checker for transition systems.
+- [kinō][kino], a model-checker for transition systems
+- [hoice][hoice], a machine-learning-based predicate synthesizer for horn clauses
 
 # License
 
@@ -20,4 +21,5 @@ MIT/Apache-2.0
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Conchon et al.)
 [doc]: https://docs.rs/hashconsing (hashconsing documentation)
-[kino]: https://github.com/kino-mc/kino (kino)
+[kino]: https://github.com/kino-mc/kino (kino on github)
+[hoice]: https://github.com/hopv/hoice (hoice on github)
