@@ -374,11 +374,20 @@ impl<
         debug_assert!(
           * hconsed.elm == elm
         ) ;
-        return (hconsed.clone(), false)
+        return (hconsed, false)
       }
     } ;
-    // Otherwise insert.
+    // Otherwise get mutable `self`.
     let mut slf = self.write().unwrap() ;
+
+    // Someone might have inserted since we checked, check again.
+    if let Some(hconsed) = slf.get(& elm) {
+      debug_assert!(
+        * hconsed.elm == elm
+      ) ;
+      return (hconsed, false)
+    }
+
     // Otherwise build hconsed version.
     let hconsed = HConsed {
       elm: Arc::new( elm.clone() ),
