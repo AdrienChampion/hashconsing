@@ -310,7 +310,9 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   /// Attempts to retrieve an *upgradable* value from the map.
   #[inline]
   fn get(& self, key: & T) -> Option<HConsed<T>> {
-    self.table.get(key).and_then(|old| old.to_hconsed())
+    if let Some(old) = self.table.get(key) {
+      old.to_hconsed()
+    } else { None }
   }
 }
 
@@ -328,7 +330,13 @@ where T: Hash + fmt::Display {
 
 /// HConsed element creation.
 pub trait HConser<T: Hash>: Sized {
-  /// Creates a HConsed element. Returns true iff the element is new.
+  /// Hashconses something and returns the hash consed version.
+  ///
+  /// Returns `true` iff the element
+  ///
+  /// - was not in the consign at all, or
+  /// - was in the consign but it is not referenced (weak ref cannot be
+  ///   upgraded.)
   fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) ;
   /// Creates a HConsed element.
   fn mk(self, elm: T) -> HConsed<T> {
@@ -361,8 +369,6 @@ impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
 impl<
   'a, T: Hash + Eq + Clone
 > HConser<T> for & 'a RwLock< HashConsign<T> > {
-  /// Hash conses something and returns the hash consed version.
-  ///
   /// If the element is already in the consign, only read access will be
   /// requested.
   fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
@@ -450,27 +456,32 @@ mod example {
     let mut consign = HashConsign::empty() ;
     assert_eq!(consign.len(), 0) ;
 
-    let v = consign.var(0) ;
-    println!("inserting {}", v) ;
+    let v1 = consign.var(0) ;
+    println!("inserting {}", v1) ;
     assert_eq!(consign.len(), 1) ;
 
     let v2 = consign.var(3) ;
     println!("inserting {}", v2) ;
     assert_eq!(consign.len(), 2) ;
+    assert_ne!( v1.uid(), v2.uid() ) ;
 
-    let lam = consign.lam(v2) ;
+    let lam = consign.lam( v2.clone() ) ;
     println!("inserting {}", lam) ;
     assert_eq!(consign.len(), 3) ;
+    assert_ne!( v1.uid(), lam.uid() ) ;
+    assert_ne!( v2.uid(), lam.uid() ) ;
 
     let v3 = consign.var(3) ;
     println!("inserting {}", v3) ;
     assert_eq!(consign.len(), 3) ;
+    assert_eq!( v2.uid(), v3.uid() ) ;
 
-    let lam2 = consign.lam(v3) ;
+    let lam2 = consign.lam( v3.clone() ) ;
     println!("inserting {}", lam2) ;
     assert_eq!(consign.len(), 3) ;
+    assert_eq!( lam.uid(), lam2.uid() ) ;
 
-    let app = consign.app(lam2, v) ;
+    let app = consign.app(lam2, v1) ;
     println!("inserting {}", app) ;
     assert_eq!(consign.len(), 4) ;
   }
