@@ -1,6 +1,8 @@
 # `hashconsing`
 
-[![Build Status](https://travis-ci.org/AdrienChampion/hashconsing.svg?branch=master)](https://travis-ci.org/AdrienChampion/hashconsing) [![Latest Version](https://img.shields.io/crates/v/hashconsing.svg)](https://crates.io/crates/hashconsing)
+| linux | windows |     |     |
+|:-----:|:-------:|:---:|:---:|
+| [![Build Status](https://travis-ci.org/AdrienChampion/hashconsing.svg?branch=master)](https://travis-ci.org/AdrienChampion/hashconsing) | [![Build status](https://ci.appveyor.com/api/projects/status/db247pe2jp9uo9cs?svg=true)](https://ci.appveyor.com/project/AdrienChampion/hashconsing) | [![Latest Version](https://img.shields.io/crates/v/hashconsing.svg)](https://crates.io/crates/hashconsing) | [![codecov](https://codecov.io/gh/AdrienChampion/hashconsing/branch/master/graph/badge.svg)](https://codecov.io/gh/AdrienChampion/hashconsing) |
 
 `hashconsing` is a hash consing library in Rust.
 
