@@ -48,5 +48,4 @@ after_success:
   cargo test --no-run &&
   for file in target/debug/hashconsing-*[^\(\.d\)]; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
   bash <(curl -s https://codecov.io/bash) &&
-  ./kcov-build/usr/local/bin/kcov --coveralls-id=$TRAVIS_JOB_ID --merge target/cov target/cov/* &&
   echo "Uploaded code coverage"
