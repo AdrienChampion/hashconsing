@@ -401,3 +401,77 @@ impl<
     (hconsed, true)
   }
 }
+
+
+#[cfg(test)]
+mod example {
+
+  use std::fmt ;
+  use * ;
+  use self::ActualTerm::* ;
+
+  type Term = HConsed<ActualTerm> ;
+
+  #[derive(Hash, Clone, PartialEq, Eq)]
+  enum ActualTerm {
+    Var(usize),
+    Lam(Term),
+    App(Term, Term)
+  }
+
+
+  impl fmt::Display for ActualTerm {
+    fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
+      match self {
+        & Var(i) => write!(fmt, "v{}", i),
+        & Lam(ref t) => write!(fmt, "({})", t.get()),
+        & App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
+      }
+    }
+  }
+
+  trait TermFactory {
+    fn var(& mut self, v: usize) -> Term ;
+    fn lam(& mut self, t: Term) -> Term ;
+    fn app(& mut self, u: Term, v: Term) -> Term ;
+  }
+
+
+  impl TermFactory for HashConsign<ActualTerm> {
+    fn var(& mut self, v: usize) -> Term { self.mk( Var(v) ) }
+    fn lam(& mut self, t: Term) -> Term { self.mk( Lam(t) ) }
+    fn app(& mut self, u: Term, v: Term) -> Term {
+      self.mk( App(u, v) )
+    }
+  }
+
+  #[test]
+  fn run() {
+    let mut consign = HashConsign::empty() ;
+    assert_eq!(consign.len(), 0) ;
+
+    let v = consign.var(0) ;
+    println!("inserting {}", v) ;
+    assert_eq!(consign.len(), 1) ;
+
+    let v2 = consign.var(3) ;
+    println!("inserting {}", v2) ;
+    assert_eq!(consign.len(), 2) ;
+
+    let lam = consign.lam(v2) ;
+    println!("inserting {}", lam) ;
+    assert_eq!(consign.len(), 3) ;
+
+    let v3 = consign.var(3) ;
+    println!("inserting {}", v3) ;
+    assert_eq!(consign.len(), 3) ;
+
+    let lam2 = consign.lam(v3) ;
+    println!("inserting {}", lam2) ;
+    assert_eq!(consign.len(), 3) ;
+
+    let app = consign.app(lam2, v) ;
+    println!("inserting {}", app) ;
+    assert_eq!(consign.len(), 4) ;
+  }
+}
