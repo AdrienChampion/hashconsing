@@ -1,10 +1,65 @@
-//! Efficient collections for hashconsed data.
-//!
-//! This module provide hash set and hash map types with trivial hash functions
-//! for hashconsed types. The hash of an hashconsed value is its unique
-//! identifier, verbatim. This is obviously extremely dangerous from a security
-//! point of view: these collections should **never** be used for cryptographic
-//! purposes.
+/*! Efficient collections for hashconsed data.
+
+This module provide hash set and hash map types with trivial hash functions
+for hashconsed types. The hash of an hashconsed value is its unique
+identifier, verbatim. This is obviously extremely dangerous from a security
+point of view: these collections should **never** be used for cryptographic
+purposes.
+
+
+# Usage
+
+> TL;DR You need to specify the hashconsed type when creating one of the
+> collections in this module.
+
+There is a bit of internal gymnastic so that the type signatures of these
+collections are natural. If `Term` is the hashconsed version of `RTerm`, then
+you want the type of the sets to be the natural one, *e.g.* `HConSet<Term>`.
+
+However, since `Term` is really an alias for `HConsed<RTerm>`, then if we
+wanted to declare `HConSet` as an alias for `HashSet` we would get
+`type HConSet<Inner> = HashSet< HConsed<Inner> >` (omitting the custom hasher).
+That is, our sets would have type `HConSet<RTerm>`, which is not very pretty.
+We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it
+turns out it's better to wrap the actual set in a `struct` anyway. Mostly to
+be able to define `new` and `with_capacity` without relying on a trait (users
+would need to import) to do that.
+
+So actually `HConsed` types automatically implement the internal
+`trait HashConsed { type Inner ; }`. The sole purpose of this trait (currently)
+is to pass the inner type implicitly thanks to a `T: HashConsed` bound. Rust's
+type inference does not seem to really like this, and struggles a bit to infer
+the types at play. In practice, it means that you need to specify the type of
+the hashconsed elements in your set/map.
+
+```
+use hashconsing::* ;
+use hashconsing::coll::* ;
+
+#[derive(Hash, Clone, PartialEq, Eq)]
+enum ActualTerm {
+  Var(usize),
+  Lam(Term),
+  App(Term, Term)
+}
+type Term = HConsed<ActualTerm> ;
+
+let mut consign = HashConsign::empty() ;
+assert_eq!(consign.len(), 0) ;
+
+let mut map: HConMap<Term,_> = HConMap::with_capacity(100) ;
+let mut set: HConSet<Term> = HConSet::with_capacity(100) ;
+
+let (v1, v1_name) = (
+  consign.mk( ActualTerm::Var(0) ), "v1"
+) ;
+assert_eq!(consign.len(), 1) ;
+let prev = map.insert(v1.clone(), v1_name) ;
+assert_eq!( prev, None ) ;
+let is_new = set.insert(v1.clone()) ;
+assert!( is_new ) ;
+```
+*/
 
 use std::collections::{ HashSet, HashMap } ;
 use std::ops::{ Deref, DerefMut } ;
@@ -17,8 +72,8 @@ use self::hash::BuildHashU64 ;
 pub struct HConSet<T: HashConsed> {
   set: HashSet< HConsed<T::Inner>, BuildHashU64 >
 }
-impl<T: HashConsed> HConSet<T>
-where T::Inner: Hash {
+impl<T> HConSet<T>
+where T: HashConsed, T::Inner: Hash {
   /// An empty set of hashconsed things.
   #[inline]
   pub fn new() -> Self {
