@@ -8,6 +8,7 @@
 
 use std::collections::{ HashSet, HashMap } ;
 use std::ops::{ Deref, DerefMut } ;
+use std::hash::Hash ;
 
 use { HConsed, HashConsed } ;
 use self::hash::BuildHashU64 ;
@@ -16,19 +17,20 @@ use self::hash::BuildHashU64 ;
 pub struct HConSet<T: HashConsed> {
   set: HashSet< HConsed<T::Inner>, BuildHashU64 >
 }
-impl<T: HashConsed> HConSet<T> {
+impl<T: HashConsed> HConSet<T>
+where T::Inner: Hash {
   /// An empty set of hashconsed things.
   #[inline]
   pub fn new() -> Self {
     HConSet {
-      set: Hash::with_hasher(BuildHashU64 {})
+      set: HashSet::with_hasher(BuildHashU64 {})
     }
   }
   /// An empty set of hashconsed things with a capacity.
   #[inline]
   pub fn with_capacity(capa: usize) -> Self {
     HConSet {
-      set: Hash::with_capacity_and_hasher(capa, BuildHashU64 {})
+      set: HashSet::with_capacity_and_hasher(capa, BuildHashU64 {})
     }
   }
 }
@@ -48,31 +50,32 @@ impl<T: HashConsed> DerefMut for HConSet<T> {
 pub struct HConMap<T: HashConsed, V> {
   map: HashMap< HConsed<T::Inner>, V, BuildHashU64 >
 }
-impl<T: HashConsed, V> HConMap<T, V> {
+impl<T: HashConsed, V> HConMap<T, V>
+where T::Inner: Hash {
   /// An empty map of hashconsed things.
   #[inline]
   pub fn new() -> Self {
     HConMap {
-      map: Hash::with_hasher(BuildHashU64 {})
+      map: HashMap::with_hasher(BuildHashU64 {})
     }
   }
   /// An empty map of hashconsed things with a capacity.
   #[inline]
   pub fn with_capacity(capa: usize) -> Self {
     HConMap {
-      map: Hash::with_capacity_and_hasher(capa, BuildHashU64 {})
+      map: HashMap::with_capacity_and_hasher(capa, BuildHashU64 {})
     }
   }
 }
 impl<T: HashConsed, V> Deref for HConMap<T, V> {
-  type Target = HashMap<HConsed<T::Inner>, BuildHashU64> ;
+  type Target = HashMap<HConsed<T::Inner>, V, BuildHashU64> ;
   fn deref(& self) -> & Self::Target {
-    & self.set
+    & self.map
   }
 }
 impl<T: HashConsed, V> DerefMut for HConMap<T, V> {
   fn deref_mut(& mut self) -> & mut Self::Target {
-    & mut self.set
+    & mut self.map
   }
 }
 
