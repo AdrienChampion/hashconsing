@@ -69,11 +69,19 @@ use { HConsed, HashConsed } ;
 use self::hash::BuildHashU64 ;
 
 /// A hash set of hash-consed things with trivial hashing.
-pub struct HConSet<T: HashConsed> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HConSet<T>
+where T: HashConsed, T::Inner: Eq + Hash {
   set: HashSet< HConsed<T::Inner>, BuildHashU64 >
 }
+impl<T> Default for HConSet<T>
+where T: HashConsed, T::Inner: Eq + Hash {
+  fn default() -> Self {
+    HConSet { set: HashSet::default() }
+  }
+}
 impl<T> HConSet<T>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Eq + Hash {
   /// An empty set of hashconsed things.
   #[inline]
   pub fn new() -> Self {
@@ -97,7 +105,7 @@ where T: HashConsed, T::Inner: Hash {
   }
 }
 impl<'a, T> IntoIterator for & 'a HConSet<T>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Hash + Eq {
   type Item = & 'a HConsed<T::Inner> ;
   type IntoIter = ::std::collections::hash_set::Iter<'a, HConsed<T::Inner>> ;
   fn into_iter(self) -> Self::IntoIter {
@@ -105,31 +113,43 @@ where T: HashConsed, T::Inner: Hash {
   }
 }
 impl<T> IntoIterator for HConSet<T>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Hash + Eq {
   type Item = HConsed<T::Inner> ;
   type IntoIter = ::std::collections::hash_set::IntoIter<HConsed<T::Inner>> ;
   fn into_iter(self) -> Self::IntoIter {
     self.set.into_iter()
   }
 }
-impl<T: HashConsed> Deref for HConSet<T> {
+impl<T> ::std::iter::FromIterator<HConsed<T::Inner>> for HConSet<T>
+where T: HashConsed, T::Inner: Hash + Eq {
+  fn from_iter<I: IntoIterator<Item = HConsed<T::Inner>>>(iter: I) -> Self {
+    HConSet {
+      set: HashSet::from_iter(iter)
+    }
+  }
+}
+impl<T> Deref for HConSet<T>
+where T: HashConsed, T::Inner: Hash + Eq {
   type Target = HashSet<HConsed<T::Inner>, BuildHashU64> ;
   fn deref(& self) -> & Self::Target {
     & self.set
   }
 }
-impl<T: HashConsed> DerefMut for HConSet<T> {
+impl<T> DerefMut for HConSet<T>
+where T: HashConsed, T::Inner: Hash + Eq {
   fn deref_mut(& mut self) -> & mut Self::Target {
     & mut self.set
   }
 }
 
 /// A hash map of hash-consed things with trivial hashing.
-pub struct HConMap<T: HashConsed, V> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HConMap<T: HashConsed, V>
+where T::Inner: Hash + Eq {
   map: HashMap< HConsed<T::Inner>, V, BuildHashU64 >
 }
 impl<T: HashConsed, V> HConMap<T, V>
-where T::Inner: Hash {
+where T::Inner: Hash + Eq {
   /// An empty map of hashconsed things.
   #[inline]
   pub fn new() -> Self {
@@ -160,7 +180,7 @@ where T::Inner: Hash {
   }
 }
 impl<'a, T, V> IntoIterator for & 'a HConMap<T, V>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Hash + Eq {
   type Item = (& 'a HConsed<T::Inner>, & 'a V) ;
   type IntoIter = ::std::collections::hash_map::Iter<
     'a, HConsed<T::Inner>, V
@@ -170,7 +190,7 @@ where T: HashConsed, T::Inner: Hash {
   }
 }
 impl<'a, T, V> IntoIterator for & 'a mut HConMap<T, V>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Hash + Eq {
   type Item = (& 'a HConsed<T::Inner>, & 'a mut V) ;
   type IntoIter = ::std::collections::hash_map::IterMut<
     'a, HConsed<T::Inner>, V
@@ -180,7 +200,7 @@ where T: HashConsed, T::Inner: Hash {
   }
 }
 impl<T, V> IntoIterator for HConMap<T, V>
-where T: HashConsed, T::Inner: Hash {
+where T: HashConsed, T::Inner: Hash + Eq {
   type Item = (HConsed<T::Inner>, V) ;
   type IntoIter = ::std::collections::hash_map::IntoIter<
     HConsed<T::Inner>, V
@@ -189,13 +209,25 @@ where T: HashConsed, T::Inner: Hash {
     self.map.into_iter()
   }
 }
-impl<T: HashConsed, V> Deref for HConMap<T, V> {
+impl<T, V> ::std::iter::FromIterator<(HConsed<T::Inner>, V)> for HConMap<T,V>
+where T: HashConsed, T::Inner: Hash + Eq {
+  fn from_iter<
+    I: IntoIterator<Item = (HConsed<T::Inner>, V)>
+  >(iter: I) -> Self {
+    HConMap {
+      map: HashMap::from_iter(iter)
+    }
+  }
+}
+impl<T: HashConsed, V> Deref for HConMap<T, V>
+where T::Inner: Hash + Eq {
   type Target = HashMap<HConsed<T::Inner>, V, BuildHashU64> ;
   fn deref(& self) -> & Self::Target {
     & self.map
   }
 }
-impl<T: HashConsed, V> DerefMut for HConMap<T, V> {
+impl<T: HashConsed, V> DerefMut for HConMap<T, V>
+where T::Inner: Hash + Eq {
   fn deref_mut(& mut self) -> & mut Self::Target {
     & mut self.map
   }
