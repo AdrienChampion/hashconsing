@@ -22,6 +22,14 @@ implements `Send` and `Sync`.
 The consign actually stores weak references to values. This ensures that values
 are dropped once they are not used anymore.
 
+
+# Collections with trivial hash function
+
+This library provides two special collections: [`HConSet`][hcon set] and
+[`HConMap`][hcon map]. They use the trivial hash function over hashconsed
+values' unique identifier. [Read more.][coll mod]
+
+
 # Example
 
 Simple example for lambda calculus from [the paper][paper].
@@ -95,6 +103,9 @@ pub fn main() {
 ```
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Type-safe modular hash-consing)
+[hcon set]: coll/struct.HConSet.html (HConSet documentation)
+[hcon map]: coll/struct.HConMap.html (HConMap documentation)
+[coll mod]: coll/index.html (coll module documentation)
 */
 
 use std::fmt ;
@@ -107,6 +118,17 @@ use std::cmp::{
 } ;
 use std::ops::Deref ;
 
+pub mod coll ;
+
+/// Internal trait used to recognize hashconsed things.
+///
+/// The only purpose of this trait (currently) is to simplify the type
+/// signature of the collections of hashconsed things.
+pub trait HashConsed {
+  /// Elements stored inside a hashconsed value.
+  type Inner ;
+}
+
 /// Stores a hash consed element and its hash in order to avoid recomputing it
 /// every time.
 pub struct HConsed<T> {
@@ -115,9 +137,12 @@ pub struct HConsed<T> {
   /// Unique identifier of the element.
   uid: u64,
 }
+impl<T> HashConsed for HConsed<T> {
+  type Inner = T ;
+}
 
 impl<T> HConsed<T> {
-  /// The element hash consed. Can also be accessed via dereferencing.
+  /// The inner element. Can also be accessed *via* dereferencing.
   #[inline(always)]
   pub fn get(& self) -> & T { self.elm.deref() }
   /// The unique identifier of the element.
