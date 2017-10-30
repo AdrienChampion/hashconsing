@@ -549,5 +549,13 @@ mod example {
     assert_eq!( prev, None ) ;
     let is_new = set.insert(app.clone()) ;
     assert!( is_new ) ;
+
+    for term in & set {
+      assert!( map.contains_key(term) )
+    }
+    for (term, val) in & map {
+      println!("looking for `{}`", val) ;
+      assert!( set.contains(term) )
+    }
   }
 }

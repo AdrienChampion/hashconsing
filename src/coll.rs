@@ -88,6 +88,29 @@ where T: HashConsed, T::Inner: Hash {
       set: HashSet::with_capacity_and_hasher(capa, BuildHashU64 {})
     }
   }
+  /// An iterator visiting all elements.
+  #[inline]
+  pub fn iter(& self) -> ::std::collections::hash_set::Iter<
+    HConsed<T::Inner>
+  > {
+    self.set.iter()
+  }
+}
+impl<'a, T> IntoIterator for & 'a HConSet<T>
+where T: HashConsed, T::Inner: Hash {
+  type Item = & 'a HConsed<T::Inner> ;
+  type IntoIter = ::std::collections::hash_set::Iter<'a, HConsed<T::Inner>> ;
+  fn into_iter(self) -> Self::IntoIter {
+    (& self.set).into_iter()
+  }
+}
+impl<T> IntoIterator for HConSet<T>
+where T: HashConsed, T::Inner: Hash {
+  type Item = HConsed<T::Inner> ;
+  type IntoIter = ::std::collections::hash_set::IntoIter<HConsed<T::Inner>> ;
+  fn into_iter(self) -> Self::IntoIter {
+    self.set.into_iter()
+  }
 }
 impl<T: HashConsed> Deref for HConSet<T> {
   type Target = HashSet<HConsed<T::Inner>, BuildHashU64> ;
@@ -120,6 +143,50 @@ where T::Inner: Hash {
     HConMap {
       map: HashMap::with_capacity_and_hasher(capa, BuildHashU64 {})
     }
+  }
+  /// An iterator visiting all elements.
+  #[inline]
+  pub fn iter(& self) -> ::std::collections::hash_map::Iter<
+    HConsed<T::Inner>, V
+  > {
+    self.map.iter()
+  }
+  /// An iterator visiting all elements.
+  #[inline]
+  pub fn iter_mut(& mut self) -> ::std::collections::hash_map::IterMut<
+    HConsed<T::Inner>, V
+  > {
+    self.map.iter_mut()
+  }
+}
+impl<'a, T, V> IntoIterator for & 'a HConMap<T, V>
+where T: HashConsed, T::Inner: Hash {
+  type Item = (& 'a HConsed<T::Inner>, & 'a V) ;
+  type IntoIter = ::std::collections::hash_map::Iter<
+    'a, HConsed<T::Inner>, V
+  > ;
+  fn into_iter(self) -> Self::IntoIter {
+    (& self.map).into_iter()
+  }
+}
+impl<'a, T, V> IntoIterator for & 'a mut HConMap<T, V>
+where T: HashConsed, T::Inner: Hash {
+  type Item = (& 'a HConsed<T::Inner>, & 'a mut V) ;
+  type IntoIter = ::std::collections::hash_map::IterMut<
+    'a, HConsed<T::Inner>, V
+  > ;
+  fn into_iter(self) -> Self::IntoIter {
+    (& mut self.map).into_iter()
+  }
+}
+impl<T, V> IntoIterator for HConMap<T, V>
+where T: HashConsed, T::Inner: Hash {
+  type Item = (HConsed<T::Inner>, V) ;
+  type IntoIter = ::std::collections::hash_map::IntoIter<
+    HConsed<T::Inner>, V
+  > ;
+  fn into_iter(self) -> Self::IntoIter {
+    self.map.into_iter()
   }
 }
 impl<T: HashConsed, V> Deref for HConMap<T, V> {
