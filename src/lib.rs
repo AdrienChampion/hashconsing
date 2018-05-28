@@ -299,14 +299,26 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
 
   /// Fold on the elements stored in the consign.
   #[inline]
-  pub fn fold<Acc, F>(& self, f: F, mut init: Acc) -> Acc
-  where F : Fn(Acc, HConsed<T>) -> Acc {
+  pub fn fold<Acc, F>(& self, mut init: Acc, mut f: F) -> Acc
+  where F: FnMut(Acc, HConsed<T>) -> Acc {
     for (_, weak) in self.table.iter() {
       if let Some(consed) = weak.to_hconsed() {
         init = f(init, consed)
       }
     }
     init
+  }
+
+  /// Fold on the elements stored in the consign, result version.
+  #[inline]
+  pub fn fold_res<Acc, F, E>(& self, mut init: Acc, mut f: F) -> Result<Acc, E>
+  where F: FnMut(Acc, HConsed<T>) -> Result<Acc, E> {
+    for (_, weak) in self.table.iter() {
+      if let Some(consed) = weak.to_hconsed() {
+        init = f(init, consed) ?
+      }
+    }
+    Ok(init)
   }
 
   /// The number of elements stored, mostly for testing.
