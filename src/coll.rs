@@ -186,6 +186,26 @@ where T: HashConsed, T::Inner: Hash + Eq {
   }
 }
 
+impl<T, Src> From<Src> for HConSet< HConsed<T> >
+where T: Hash + Eq, Src: Iterator<Item = HConsed<T>> {
+  fn from(src: Src) -> Self {
+    let mut set = HConSet::new() ;
+    for elem in src {
+      set.insert(elem) ;
+    }
+    set
+  }
+}
+
+
+
+
+
+
+
+
+
+
 /// A hash map of hash-consed things with trivial hashing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HConMap<T, V>
@@ -286,6 +306,21 @@ where T::Inner: Hash + Eq {
     & mut self.map
   }
 }
+
+impl<T, V, Src> From<Src> for HConMap< HConsed<T>, V >
+where T: Hash + Eq, Src: Iterator<Item = (HConsed<T>, V)> {
+  fn from(src: Src) -> Self {
+    let mut set = HConMap::new() ;
+    for (elem, value) in src {
+      set.insert(elem, value) ;
+    }
+    set
+  }
+}
+
+
+
+
 
 
 /// Optimal trivial hash for `usize`s and `u64`s. The former is used for
