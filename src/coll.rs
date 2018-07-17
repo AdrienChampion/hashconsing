@@ -47,7 +47,7 @@
 //! }
 //! type Term = HConsed<ActualTerm> ;
 //! 
-//! let mut consign = HashConsign::empty() ;
+//! let mut consign = HConsign::empty() ;
 //! assert_eq!(consign.len(), 0) ;
 //! 
 //! let mut map: HConMap<Term,_> = HConMap::with_capacity(100) ;
@@ -80,7 +80,7 @@
 //! type TermMap<T> = HConMap<Term, T> ;
 //! type TermSet = HConSet<Term> ;
 //! 
-//! let mut consign = HashConsign::empty() ;
+//! let mut consign = HConsign::empty() ;
 //! assert_eq!(consign.len(), 0) ;
 //! 
 //! let mut map = TermMap::with_capacity(100) ;
@@ -104,10 +104,18 @@ use { HConsed, HashConsed } ;
 use self::hash::BuildHashU64 ;
 
 /// A hash set of hash-consed things with trivial hashing.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct HConSet<T>
 where T: HashConsed, T::Inner: Eq + Hash {
   set: HashSet< HConsed<T::Inner>, BuildHashU64 >
+}
+impl<T> PartialEq for HConSet<T>
+where T: HashConsed, T::Inner: Eq + Hash {
+  fn eq(& self, other: & Self) -> bool {
+    self.len() == other.len() && self.iter().zip(
+      other.iter()
+    ).all( |(e_1, e_2)| e_1 == e_2 )
+  }
 }
 impl<T> Hash for HConSet<T>
 where T: HashConsed, T::Inner: Eq + Hash {
@@ -118,12 +126,14 @@ where T: HashConsed, T::Inner: Eq + Hash {
     }
   }
 }
+
 impl<T> Default for HConSet<T>
 where T: HashConsed, T::Inner: Eq + Hash {
   fn default() -> Self {
     HConSet { set: HashSet::default() }
   }
 }
+
 impl<T> HConSet<T>
 where T: HashConsed, T::Inner: Eq + Hash {
   /// An empty set of hashconsed things.
@@ -207,10 +217,21 @@ where T: Hash + Eq, Src: Iterator<Item = HConsed<T>> {
 
 
 /// A hash map of hash-consed things with trivial hashing.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct HConMap<T, V>
 where T: HashConsed, T::Inner: Hash + Eq {
   map: HashMap< HConsed<T::Inner>, V, BuildHashU64 >
+}
+
+impl<T, V> PartialEq for HConMap<T, V>
+where T: HashConsed, T::Inner: Eq + Hash, V: Eq {
+  fn eq(& self, other: & Self) -> bool {
+    self.len() == other.len() && self.iter().zip(
+      other.iter()
+    ).all(
+      |((k_1, v_1), (k_2, v_2))| k_1 == k_2 && v_1 == v_2
+    )
+  }
 }
 impl<T, V> Hash for HConMap<T, V>
 where T: HashConsed, T::Inner: Eq + Hash, V: Hash {
@@ -222,6 +243,17 @@ where T: HashConsed, T::Inner: Eq + Hash, V: Hash {
     }
   }
 }
+
+impl<T, V> Default for HConMap<T, V>
+where T: HashConsed, T::Inner: Eq + Hash {
+  fn default() -> Self {
+    HConMap { map: HashMap::default() }
+  }
+}
+
+
+
+
 impl<T: HashConsed, V> HConMap<T, V>
 where T::Inner: Hash + Eq {
   /// An empty map of hashconsed things.
@@ -383,9 +415,7 @@ mod hash {
     }
     fn write(& mut self, bytes: & [u8]) {
       Self::test_bytes(bytes) ;
-      for n in 0..8 {
-        self.buf[n] = bytes[n]
-      }
+      self.buf[..8].clone_from_slice(& bytes[..8])
     }
   }
 }

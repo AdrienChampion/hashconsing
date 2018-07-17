@@ -8,13 +8,16 @@
 
 /*! Hash consing library.
 
-It is a based on [Type-Safe Modular Hash-Consing](paper) by Filiâtre and
-Conchon. It is slightly less efficient as uses Rust's `HashMap`s, not a custom
-built structure.
+This library is based on [Type-Safe Modular Hash-Consing](paper) by Filiâtre
+and Conchon. It is probably less efficient as uses Rust's `HashMap`s, not a
+custom built structure.
+
+If you are not familiar with hashconsing, see the [example](#example) below or
+read the paper.
 
 Provides constant time comparison and perfect (maximal) sharing assuming only
-one `HashConsign` is created for a given type. This assumption **must never be
-falsified** unless you really, **really** know what you are doing.
+one consign/factory is created for a given type. This assumption **must never
+be falsified** unless you really, **really** know what you are doing.
 
 Hash consed elements are immutable and therefore thread-safe: `HConsed`
 implements `Send` and `Sync`.
@@ -23,90 +26,208 @@ The consign actually stores weak references to values. This ensures that values
 are dropped once they are not used anymore.
 
 
-# Collections with trivial hash function
-
-This library provides two special collections: [`HConSet`][hcon set] and
-[`HConMap`][hcon map]. They use the trivial hash function over hashconsed
-values' unique identifier. [Read more.][coll mod]
-
-
 # Example
 
 Simple example for lambda calculus from [the paper][paper].
 
-```
+Hashconsing consists in wrapping some tree-like datatype in an immutable
+container, which in the case of `hashconsing` is [`HConsed`]. In this example
+we'll call the tree-like datatype `ActualTerm` and the hashconsed version
+`Term`.
+
+A `Term` is created from an `ActualTerm` by a *factory*, which `hashconsing`
+calls a *consign* (see [`HConsign`]). The functions for doing so are in the
+[`HashConsign` trait]. The idea is that the consign is a map from actual terms
+to `Arc`s of hashconsed terms. When given an actual term, the consign checks
+whether there's already a hashconsed term for it. If not, then it creates one,
+memorizes it and returns that. Otherwise it clones the existing one. Hence
+subterm sharing is maximal/perfect.
+
+A `HConsed<T>` is exactly two things: a unique identifier `uid` and an `Arc` to
+the real term it represents. (Hence, cloning a hashconsed term is cheap.) This
+library guarantees that two hashconsed terms refer to structurally identical
+real terms **iff** their `uid`s are equal. Hence, equality checking is constant
+time.
+
+```rust
 extern crate hashconsing ;
-
-use std::fmt ;
-use ::hashconsing::* ;
-
-
-use self::ActualTerm::* ;
+use hashconsing::{ HConsed, HashConsign, HConsign } ;
 
 type Term = HConsed<ActualTerm> ;
 
-#[derive(Hash, Clone, PartialEq, Eq)]
+#[derive(Debug, Hash, Clone, PartialEq, Eq)]
 enum ActualTerm {
   Var(usize),
   Lam(Term),
   App(Term, Term)
 }
+use self::ActualTerm::* ;
 
+fn main() {
+  let mut factory: HConsign<ActualTerm> = HConsign::empty() ;
 
-impl fmt::Display for ActualTerm {
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    match self {
-      & Var(i) => write!(fmt, "v{}", i),
-      & Lam(ref t) => write!(fmt, "({})", t.get()),
-      & App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
-    }
-  }
-}
+  assert_eq! { factory.len(), 0 }
 
-trait TermFactory {
-  fn var(& mut self, v: usize) -> Term ;
-  fn lam(& mut self, t: Term) -> Term ;
-  fn app(& mut self, u: Term, v: Term) -> Term ;
-}
+  let v = factory.mk( Var(0) ) ;
+  assert_eq! { factory.len(), 1 }
 
+  let v2 = factory.mk( Var(3) ) ;
+  assert_eq! { factory.len(), 2 }
 
-impl TermFactory for HashConsign<ActualTerm> {
-  fn var(& mut self, v: usize) -> Term { self.mk( Var(v) ) }
-  fn lam(& mut self, t: Term) -> Term { self.mk( Lam(t) ) }
-  fn app(& mut self, u: Term, v: Term) -> Term {
-    self.mk( App(u, v) )
-  }
-}
+  let lam = factory.mk(
+    Lam( v2.clone() )
+  ) ;
+  assert_eq! { factory.len(), 3 }
 
-pub fn main() {
-  let mut consign = HashConsign::empty() ;
-  assert_eq!(consign.len(), 0) ;
+  let v3 = factory.mk( Var(3) ) ;
+  // v2 is the same as v3: Var(3). Consign has not created anything new, and
+  // v2 and v3 are conceptually the same term.
+  assert_eq! { factory.len(), 3 }
+  assert_eq! { v2.uid(), v3.uid() }
+  assert_eq! { v2.get(), v3.get() }
+  assert_eq! { v2,       v3       }
 
-  let v = consign.var(0) ;
-  assert_eq!(consign.len(), 1) ;
+  let lam2 = factory.mk( Lam(v3) ) ;
+  // Not new either.
+  assert_eq! { factory.len(), 3 }
+  assert_eq! { lam.uid(), lam2.uid() }
+  assert_eq! { lam.get(), lam2.get() }
+  assert_eq! { lam,       lam2       }
 
-  let v2 = consign.var(3) ;
-  assert_eq!(consign.len(), 2) ;
-
-  let lam = consign.lam(v2) ;
-  assert_eq!(consign.len(), 3) ;
-
-  let v3 = consign.var(3) ;
-  assert_eq!(consign.len(), 3) ;
-
-  let lam2 = consign.lam(v3) ;
-  assert_eq!(consign.len(), 3) ;
-
-  let app = consign.app(lam2, v) ;
-  assert_eq!(consign.len(), 4) ;
+  let app = factory.mk( App(lam2, v) ) ;
+  assert_eq! { factory.len(), 4 }
 }
 ```
 
-[paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Type-safe modular hash-consing)
-[hcon set]: coll/struct.HConSet.html (HConSet documentation)
-[hcon map]: coll/struct.HConMap.html (HConMap documentation)
+This library maintains the invariant stated above as long as you **never create
+two consigns for the same type**.
+
+Users are free to use the consign however they see fit: one can create a
+factory directly as in the example above, but passing it around everywhere it's
+needed is tedious. The author recommends the following workflow instead. It
+relies on the [`new_consign`] macro which creates a [lazy static] factory
+protected by a `RwLock` for thread-safety. The consign and the constructors are
+wrapped in an appropriately named module. The consign is invisible and creating
+terms is easy.
+
+```rust
+extern crate hashconsing ;
+
+pub mod term {
+  use hashconsing::* ;
+  pub type Term = HConsed<ActualTerm> ;
+  #[derive(Debug, Hash, Clone, PartialEq, Eq)]
+  pub enum ActualTerm {
+    Var(usize),
+    Lam(Term),
+    App(Term, Term)
+  }
+
+  new_consign! {
+    /// Factory for terms.
+    let factory = consign(37) for ActualTerm ;
+  }
+  pub fn var(v: usize) -> Term {
+    factory.mk( ActualTerm::Var(v) )
+  }
+  pub fn lam(t: Term) -> Term {
+    factory.mk( ActualTerm::Lam(t) )
+  }
+  pub fn app(t_1: Term, t_2: Term) -> Term {
+    factory.mk( ActualTerm::App(t_1, t_2) )
+  }
+}
+
+fn main() {
+  let v = term::var(0) ;
+  let v2 = term::var(3) ;
+  let lam = term::lam(v2) ;
+  let v3 = term::var(3) ;
+  let lam2 = term::lam(v3) ;
+  let app = term::app(lam2, v) ;
+}
+```
+
+
+
+Note that `HConsed<T>` `Deref`s to `T`, so you don't need to extend
+`HConsed<T>` using some trait to add the functions you need. Just implement
+them for `T`. Functions taking an `& mut self` won't work since `HConsed<T>`
+gives you access to `T` through an `Arc`.
+
+
+
+
+```rust
+# extern crate hashconsing ;
+# pub mod term {
+#   use hashconsing::* ;
+#   pub type Term = HConsed<ActualTerm> ;
+#   #[derive(Debug, Hash, Clone, PartialEq, Eq)]
+#   pub enum ActualTerm {
+#     Var(usize),
+#     Lam(Term),
+#     App(Term, Term)
+#   }
+# 
+#   new_consign! {
+#     /// Factory for terms.
+#     let factory = consign(37) for ActualTerm ;
+#   }
+#   pub fn var(v: usize) -> Term {
+#     factory.mk( ActualTerm::Var(v) )
+#   }
+#   pub fn lam(t: Term) -> Term {
+#     factory.mk( ActualTerm::Lam(t) )
+#   }
+#   pub fn app(t_1: Term, t_2: Term) -> Term {
+#     factory.mk( ActualTerm::App(t_1, t_2) )
+#   }
+impl ::std::fmt::Display for ActualTerm {
+  fn fmt(& self, fmt: & mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+    match self {
+      ActualTerm::Var(i) => write!(fmt, "v{}", i),
+      ActualTerm::Lam(t) => write!(fmt, "({})", t.get()),
+      ActualTerm::App(u, v) => write!(
+        fmt, "{}.{}", u.get(), v.get()
+      ),
+    }
+  }
+}
+# }
+fn main() {
+  let v = term::var(0) ;
+  let v3 = term::var(3) ;
+  let lam2 = term::lam(v3) ;
+  let app = term::app(lam2, v) ;
+  assert_eq! { & format!("{}", app), "(v3).v0" }
+}
+```
+
+
+# Collections with trivial hash function
+
+This library provides two special collections: [`HConSet`] and
+[`HConMap`]. They use the trivial hash function over hashconsed
+values' unique identifier. [Read more.][coll mod]
+
+Another way to have efficient sets/maps of/from hashconsed things is to use the
+`BTree` sets and maps from the standard library.
+
+[paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880
+(Type-safe modular hash-consing)
+[`HConsed`]: trait.HashConsed.html (HConsed type)
+[`HConSet`]: coll/struct.HConSet.html (HConSet documentation)
+[`HConMap`]: coll/struct.HConMap.html (HConMap documentation)
+[`HashConsign` trait]: trait.HashConsign.html (HashConsign trait)
+[`HConsign`]: struct.HConsign.html (HConsign type)
+[`new_consign`]: macro.new_consign.html (new_consign macro)
 [coll mod]: coll/index.html (coll module documentation)
+[lazy static]: https://crates.io/crates/lazy_static
+(lazy_static library on crates.io)
 */
+
+extern crate lazy_static ;
 
 use std::fmt ;
 use std::sync::{ RwLock, Arc, Weak } ;
@@ -117,6 +238,35 @@ use std::cmp::{
   PartialEq, Eq, PartialOrd, Ord, Ordering
 } ;
 use std::ops::Deref ;
+
+pub use lazy_static::* ;
+/// Creates a lazy static consign.
+///
+/// The consign is protected by a `RwLock`.
+///
+/// Arguments:
+/// - `$(#[$meta:meta])*` meta stuff, typically comments ;
+/// - `$name:ident` name of the consign ;
+/// - `$capa:expr` capacity used when creating the consign ;
+/// - `$typ:typ,` type being hashconsed (the underlying type, not the
+///   hashconsed one) ;
+#[macro_export]
+macro_rules! new_consign {
+  (
+    $(#[$meta:meta])*
+    let $name:ident = consign($capa:expr) for $typ:ty ;
+  ) => (
+    lazy_static! {
+      $(#[$meta])*
+      static ref $name: ::std::sync::RwLock<
+        $crate::HConsign<$typ>
+      > = ::std::sync::RwLock::new(
+        HConsign::with_capacity( $capa )
+      ) ;
+    }
+  ) ;
+}
+
 
 pub mod coll ;
 
@@ -271,18 +421,18 @@ impl<T> Ord for WHConsed<T> {
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HashConsign<T : Hash + Eq + Clone> {
+pub struct HConsign<T : Hash + Eq + Clone> {
   /// The actual hash consing table.
   table: HashMap<T, WHConsed<T>>,
   /// Counter for uids.
   count: u64,
 }
 
-impl<T : Hash + Eq + Clone> HashConsign<T> {
+impl<T : Hash + Eq + Clone> HConsign<T> {
   /// Creates an empty consign.
   #[inline(always)]
   pub fn empty() -> Self {
-    HashConsign {
+    HConsign {
       table: HashMap::new(),
       count: 0,
     }
@@ -291,7 +441,7 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   /// Creates an empty consign with a capacity.
   #[inline(always)]
   pub fn with_capacity(capacity: usize) -> Self {
-    HashConsign {
+    HConsign {
       table: HashMap::with_capacity(capacity),
       count: 0,
     }
@@ -301,7 +451,7 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   #[inline]
   pub fn fold<Acc, F>(& self, mut init: Acc, mut f: F) -> Acc
   where F: FnMut(Acc, HConsed<T>) -> Acc {
-    for (_, weak) in self.table.iter() {
+    for weak in self.table.values() {
       if let Some(consed) = weak.to_hconsed() {
         init = f(init, consed)
       }
@@ -313,7 +463,7 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   #[inline]
   pub fn fold_res<Acc, F, E>(& self, mut init: Acc, mut f: F) -> Result<Acc, E>
   where F: FnMut(Acc, HConsed<T>) -> Result<Acc, E> {
-    for (_, weak) in self.table.iter() {
+    for weak in self.table.values() {
       if let Some(consed) = weak.to_hconsed() {
         init = f(init, consed) ?
       }
@@ -324,6 +474,9 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   /// The number of elements stored, mostly for testing.
   #[inline(always)]
   pub fn len(& self) -> usize { self.table.len() }
+  /// True if the consign is empty.
+  #[inline(always)]
+  pub fn is_empty(& self) -> bool { self.table.is_empty() }
 
   /// Inserts in the consign.
   ///
@@ -353,11 +506,11 @@ impl<T : Hash + Eq + Clone> HashConsign<T> {
   }
 }
 
-impl<T: Hash + Eq + Clone> fmt::Display for HashConsign<T>
+impl<T: Hash + Eq + Clone> fmt::Display for HConsign<T>
 where T: Hash + fmt::Display {
   fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
     try!( write!(fmt, "consign:") ) ;
-    for (_, ref e) in self.table.iter() {
+    for e in self.table.values() {
       try!( write!(fmt, "\n  | {}", e) ) ;
     }
     Ok(())
@@ -366,7 +519,10 @@ where T: Hash + fmt::Display {
 
 
 /// HConsed element creation.
-pub trait HConser<T: Hash>: Sized {
+///
+/// Implemented *via* a trait to be able to extend `RwLock` for lazy static
+/// consigns.
+pub trait HashConsign<T: Hash>: Sized {
   /// Hashconses something and returns the hash consed version.
   ///
   /// Returns `true` iff the element
@@ -380,7 +536,7 @@ pub trait HConser<T: Hash>: Sized {
     self.mk_is_new(elm).0
   }
 }
-impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
+impl<'a, T: Hash + Eq + Clone> HashConsign<T> for & 'a mut HConsign<T> {
   /// Hash conses something and returns the hash consed version.
   fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
     // If the element is known and upgradable return it.
@@ -405,7 +561,7 @@ impl<'a, T: Hash + Eq + Clone> HConser<T> for & 'a mut HashConsign<T> {
 }
 impl<
   'a, T: Hash + Eq + Clone
-> HConser<T> for & 'a RwLock< HashConsign<T> > {
+> HashConsign<T> for & 'a RwLock< HConsign<T> > {
   /// If the element is already in the consign, only read access will be
   /// requested.
   fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
@@ -481,7 +637,7 @@ mod example {
   }
 
 
-  impl TermFactory for HashConsign<ActualTerm> {
+  impl TermFactory for HConsign<ActualTerm> {
     fn var(& mut self, v: usize) -> Term { self.mk( Var(v) ) }
     fn lam(& mut self, t: Term) -> Term { self.mk( Lam(t) ) }
     fn app(& mut self, u: Term, v: Term) -> Term {
@@ -491,7 +647,7 @@ mod example {
 
   #[test]
   fn run() {
-    let mut consign = HashConsign::empty() ;
+    let mut consign = HConsign::empty() ;
     assert_eq!(consign.len(), 0) ;
 
     let mut map: HConMap<Term,_> = HConMap::with_capacity(100) ;

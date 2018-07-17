@@ -1,6 +1,6 @@
 [package]
 name = "hashconsing"
-version = "0.9.10"
+version = "0.9.11"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "A hash consing library."
 documentation = "https://docs.rs/hashconsing"
@@ -15,3 +15,6 @@ license = "MIT/Apache-2.0"
 travis-ci = { repository = "AdrienChampion/hashconsing", service = "github" }
 appveyor = { repository = "AdrienChampion/hashconsing" }
 codecov = { repository = "AdrienChampion/hashconsing", service = "github" }
+
+[dependencies]
+lazy_static="1.*"
