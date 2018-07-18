@@ -1,6 +1,6 @@
 [package]
 name = "hashconsing"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "A hash consing library."
 documentation = "https://docs.rs/hashconsing"

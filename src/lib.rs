@@ -261,7 +261,7 @@ macro_rules! new_consign {
       static ref $name: ::std::sync::RwLock<
         $crate::HConsign<$typ>
       > = ::std::sync::RwLock::new(
-        HConsign::with_capacity( $capa )
+        $crate::HConsign::with_capacity( $capa )
       ) ;
     }
   ) ;
