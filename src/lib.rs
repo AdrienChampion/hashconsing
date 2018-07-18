@@ -111,10 +111,11 @@ wrapped in an appropriately named module. The consign is invisible and creating
 terms is easy.
 
 ```rust
+#[macro_use]
 extern crate hashconsing ;
 
 pub mod term {
-  use hashconsing::* ;
+  use hashconsing::{ HConsed, HashConsign } ;
   pub type Term = HConsed<ActualTerm> ;
   #[derive(Debug, Hash, Clone, PartialEq, Eq)]
   pub enum ActualTerm {
