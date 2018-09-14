@@ -228,19 +228,18 @@ Another way to have efficient sets/maps of/from hashconsed things is to use the
 (lazy_static library on crates.io)
 */
 
-extern crate lazy_static ;
+extern crate lazy_static;
 
-use std::fmt ;
-use std::sync::{ RwLock, Arc, Weak } ;
-use std::marker::{ Send, Sync } ;
-use std::collections::HashMap ;
-use std::hash::{ Hash, Hasher } ;
-use std::cmp::{
-  PartialEq, Eq, PartialOrd, Ord, Ordering
-} ;
-use std::ops::Deref ;
+use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
+use std::collections::HashMap;
+use std::fmt;
+use std::hash::{Hash, Hasher};
+use std::marker::{Send, Sync};
+use std::ops::Deref;
+use std::sync::{Arc, RwLock, Weak};
 
-pub use lazy_static::* ;
+pub use lazy_static::*;
+
 /// Creates a lazy static consign.
 ///
 /// The consign is protected by a `RwLock`.
@@ -253,478 +252,535 @@ pub use lazy_static::* ;
 ///   hashconsed one) ;
 #[macro_export]
 macro_rules! new_consign {
-  (
-    $(#[$meta:meta])*
-    let $name:ident = consign($capa:expr) for $typ:ty ;
-  ) => (
-    lazy_static! {
-      $(#[$meta])*
-      static ref $name: ::std::sync::RwLock<
-        $crate::HConsign<$typ>
-      > = ::std::sync::RwLock::new(
-        $crate::HConsign::with_capacity( $capa )
-      ) ;
-    }
-  ) ;
+    (
+        $(#[$meta:meta])*
+        let $name:ident = consign($capa:expr) for $typ:ty ;
+    ) => (
+        lazy_static! {
+            $(#[$meta])*
+            static ref $name: ::std::sync::RwLock<
+                $crate::HConsign<$typ>
+            > = ::std::sync::RwLock::new(
+                $crate::HConsign::with_capacity( $capa )
+            );
+        }
+    );
 }
 
+pub mod coll;
 
-pub mod coll ;
+/// Creates a hash-cons container for a type.
+#[macro_export]
+macro_rules! new_hconsed {
+    (
+        $(
+            $(#[$meta:meta])*
+            $ty:ident for $inner:ty ;
+        )*
+    ) => ({
+        mod obscure_hashcons_module {$(
+            $(#[$meta])*
+            pub struct $ident {
+                /// Inner element.
+                elm: $inner,
+                /// Uid of the element.
+                uid: u64,
+            }
+            impl $crate::HashConsed for $ty {
+                type inner = $inner;
+            }
+            impl $ident {
+                /// The inner element. Can also be accessed *via* dereferencing.
+                #[inline]
+                pub fn get(&self) -> &$inner {
+                    self.elm.deref()
+                }
+                /// The unique identifier of the element.
+                #[inline]
+                pub fn uid(&self) -> u64 {
+                    self.uid
+                }
+                /// Turns a hashconsed value in a weak hashconsed value.
+                #[inline]
+                pub fn to_weak(&self) -> WHConsed<$inner> {
+                    $crate::WHConsed {
+                        elm: Arc::downgrade(&self.elm),
+                        uid: self.uid,
+                    }
+                }
+            }
+        )*}
+        pub use obscure_hashcons_module::{
+            $($ty),*
+        };
+    });
+}
 
 /// Internal trait used to recognize hashconsed things.
 ///
 /// The only purpose of this trait (currently) is to simplify the type
 /// signature of the collections of hashconsed things.
 pub trait HashConsed {
-  /// Elements stored inside a hashconsed value.
-  type Inner ;
+    /// Elements stored inside a hashconsed value.
+    type Inner;
 }
 
 /// Stores a hash consed element and its hash in order to avoid recomputing it
 /// every time.
 pub struct HConsed<T> {
-  /// The actual element.
-  elm: Arc<T>,
-  /// Unique identifier of the element.
-  uid: u64,
+    /// The actual element.
+    elm: Arc<T>,
+    /// Unique identifier of the element.
+    uid: u64,
 }
 impl<T> HashConsed for HConsed<T> {
-  type Inner = T ;
+    type Inner = T;
 }
 
 impl<T> HConsed<T> {
-  /// The inner element. Can also be accessed *via* dereferencing.
-  #[inline(always)]
-  pub fn get(& self) -> & T { self.elm.deref() }
-  /// The unique identifier of the element.
-  #[inline(always)]
-  pub fn uid(& self) -> u64 { self.uid }
-  /// Turns a hashconsed thing in a weak hashconsed thing.
-  #[inline(always)]
-  fn to_weak(& self) -> WHConsed<T> {
-    WHConsed {
-      elm: Arc::downgrade(& self.elm), uid: self.uid
+    /// The inner element. Can also be accessed *via* dereferencing.
+    #[inline]
+    pub fn get(&self) -> &T {
+        self.elm.deref()
     }
-  }
+    /// The unique identifier of the element.
+    #[inline]
+    pub fn uid(&self) -> u64 {
+        self.uid
+    }
+    /// Turns a hashconsed thing in a weak hashconsed thing.
+    #[inline]
+    fn to_weak(&self) -> WHConsed<T> {
+        WHConsed {
+            elm: Arc::downgrade(&self.elm),
+            uid: self.uid,
+        }
+    }
+
+    /// Number of (strong) references to this term.
+    pub fn arc_count(&self) -> usize {
+        Arc::strong_count(&self.elm)
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    write!(fmt, "{:?}", self.elm)
-  }
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "{:?}", self.elm)
+    }
 }
 
 impl<T> Clone for HConsed<T> {
-  fn clone(& self) -> Self {
-    HConsed {
-      elm: self.elm.clone(),
-      uid: self.uid,
+    fn clone(&self) -> Self {
+        HConsed {
+            elm: self.elm.clone(),
+            uid: self.uid,
+        }
     }
-  }
 }
 
 impl<T> PartialEq for HConsed<T> {
-  #[inline(always)]
-  fn eq(& self, rhs: & Self) -> bool {
-    self.uid == rhs.uid
-  }
+    #[inline]
+    fn eq(&self, rhs: &Self) -> bool {
+        self.uid == rhs.uid
+    }
 }
 impl<T> Eq for HConsed<T> {}
 impl<T> PartialOrd for HConsed<T> {
-  #[inline(always)]
-  fn partial_cmp(& self, other: & Self) -> Option<Ordering> {
-    self.uid.partial_cmp(& other.uid)
-  }
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.uid.partial_cmp(&other.uid)
+    }
 }
 impl<T> Ord for HConsed<T> {
-  #[inline(always)]
-  fn cmp(& self, other: & Self) -> Ordering {
-    self.uid.cmp(& other.uid)
-  }
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.uid.cmp(&other.uid)
+    }
 }
 impl<T: Hash> Hash for HConsed<T> {
-  #[inline(always)]
-  fn hash<H>(& self, state: & mut H) where H: Hasher {
-    self.uid.hash(state)
-  }
+    #[inline]
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.uid.hash(state)
+    }
 }
 
 impl<T> Deref for HConsed<T> {
-  type Target = T ;
-  #[inline(always)]
-  fn deref(& self) -> & T { self.elm.deref() }
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        self.elm.deref()
+    }
 }
 
 unsafe impl<T> Sync for HConsed<T> {}
 unsafe impl<T> Send for HConsed<T> {}
 
 impl<T: fmt::Display> fmt::Display for HConsed<T> {
-  #[inline(always)]
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    self.elm.fmt(fmt)
-  }
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.elm.fmt(fmt)
+    }
 }
 
 /// Weak version of `HConsed` (internal).
 struct WHConsed<T> {
-  /// The actual element.
-  elm: Weak<T>,
-  /// Unique identifier of the element.
-  uid: u64,
+    /// The actual element.
+    elm: Weak<T>,
+    /// Unique identifier of the element.
+    uid: u64,
 }
 impl<T> WHConsed<T> {
-  /// Turns a weak hashconsed thing in a hashconsed thing.
-  pub fn to_hconsed(& self) -> Option<HConsed<T>> {
-    if let Some(arc) = self.elm.upgrade() {
-      Some(
-        HConsed {
-          elm: arc, uid: self.uid
+    /// Turns a weak hashconsed thing in a hashconsed thing.
+    pub fn to_hconsed(&self) -> Option<HConsed<T>> {
+        if let Some(arc) = self.elm.upgrade() {
+            Some(HConsed {
+                elm: arc,
+                uid: self.uid,
+            })
+        } else {
+            None
         }
-      )
-    } else { None }
-  }
+    }
 }
 
 impl<T: fmt::Display> fmt::Display for WHConsed<T> {
-  #[inline(always)]
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    if let Some(arc) = self.elm.upgrade() { arc.fmt(fmt) } else {
-      write!(fmt, "<freed>")
+    #[inline]
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(arc) = self.elm.upgrade() {
+            arc.fmt(fmt)
+        } else {
+            write!(fmt, "<freed>")
+        }
     }
-  }
 }
 
 impl<T> Hash for WHConsed<T> {
-  #[inline(always)]
-  fn hash<H>(& self, state: & mut H) where H: Hasher {
-    self.uid.hash(state)
-  }
+    #[inline]
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.uid.hash(state)
+    }
 }
 
 impl<T> PartialEq for WHConsed<T> {
-  #[inline(always)]
-  fn eq(& self, rhs: & Self) -> bool {
-    self.uid == rhs.uid
-  }
+    #[inline]
+    fn eq(&self, rhs: &Self) -> bool {
+        self.uid == rhs.uid
+    }
 }
 impl<T> Eq for WHConsed<T> {}
 impl<T> PartialOrd for WHConsed<T> {
-  #[inline(always)]
-  fn partial_cmp(& self, other: & Self) -> Option<Ordering> {
-    self.uid.partial_cmp(& other.uid)
-  }
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.uid.partial_cmp(&other.uid)
+    }
 }
 impl<T> Ord for WHConsed<T> {
-  #[inline(always)]
-  fn cmp(& self, other: & Self) -> Ordering {
-    self.uid.cmp(& other.uid)
-  }
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.uid.cmp(&other.uid)
+    }
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HConsign<T : Hash + Eq + Clone> {
-  /// The actual hash consing table.
-  table: HashMap<T, WHConsed<T>>,
-  /// Counter for uids.
-  count: u64,
+pub struct HConsign<T: Hash + Eq + Clone> {
+    /// The actual hash consing table.
+    table: HashMap<T, WHConsed<T>>,
+    /// Counter for uids.
+    count: u64,
 }
 
-impl<T : Hash + Eq + Clone> HConsign<T> {
-  /// Creates an empty consign.
-  #[inline(always)]
-  pub fn empty() -> Self {
-    HConsign {
-      table: HashMap::new(),
-      count: 0,
+impl<T: Hash + Eq + Clone> HConsign<T> {
+    /// Creates an empty consign.
+    #[inline]
+    pub fn empty() -> Self {
+        HConsign {
+            table: HashMap::new(),
+            count: 0,
+        }
     }
-  }
 
-  /// Creates an empty consign with a capacity.
-  #[inline(always)]
-  pub fn with_capacity(capacity: usize) -> Self {
-    HConsign {
-      table: HashMap::with_capacity(capacity),
-      count: 0,
+    /// Creates an empty consign with a capacity.
+    #[inline]
+    pub fn with_capacity(capacity: usize) -> Self {
+        HConsign {
+            table: HashMap::with_capacity(capacity),
+            count: 0,
+        }
     }
-  }
 
-  /// Fold on the elements stored in the consign.
-  #[inline]
-  pub fn fold<Acc, F>(& self, mut init: Acc, mut f: F) -> Acc
-  where F: FnMut(Acc, HConsed<T>) -> Acc {
-    for weak in self.table.values() {
-      if let Some(consed) = weak.to_hconsed() {
-        init = f(init, consed)
-      }
+    /// Fold on the elements stored in the consign.
+    #[inline]
+    pub fn fold<Acc, F>(&self, mut init: Acc, mut f: F) -> Acc
+    where
+        F: FnMut(Acc, HConsed<T>) -> Acc,
+    {
+        for weak in self.table.values() {
+            if let Some(consed) = weak.to_hconsed() {
+                init = f(init, consed)
+            }
+        }
+        init
     }
-    init
-  }
 
-  /// Fold on the elements stored in the consign, result version.
-  #[inline]
-  pub fn fold_res<Acc, F, E>(& self, mut init: Acc, mut f: F) -> Result<Acc, E>
-  where F: FnMut(Acc, HConsed<T>) -> Result<Acc, E> {
-    for weak in self.table.values() {
-      if let Some(consed) = weak.to_hconsed() {
-        init = f(init, consed) ?
-      }
+    /// Fold on the elements stored in the consign, result version.
+    #[inline]
+    pub fn fold_res<Acc, F, E>(&self, mut init: Acc, mut f: F) -> Result<Acc, E>
+    where
+        F: FnMut(Acc, HConsed<T>) -> Result<Acc, E>,
+    {
+        for weak in self.table.values() {
+            if let Some(consed) = weak.to_hconsed() {
+                init = f(init, consed)?
+            }
+        }
+        Ok(init)
     }
-    Ok(init)
-  }
 
-  /// The number of elements stored, mostly for testing.
-  #[inline(always)]
-  pub fn len(& self) -> usize { self.table.len() }
-  /// True if the consign is empty.
-  #[inline(always)]
-  pub fn is_empty(& self) -> bool { self.table.is_empty() }
+    /// The number of elements stored, mostly for testing.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.table.len()
+    }
+    /// True if the consign is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.table.is_empty()
+    }
 
-  /// Inserts in the consign.
-  ///
-  /// One of the following must hold:
-  ///
-  /// - `self.table` is not defined at `key`
-  /// - the weak ref in `self.table` at `key` returns `None` when upgraded.
-  ///
-  /// This is checked in `debug` but not `release`.
-  #[inline]
-  fn insert(& mut self, key: T, wconsed: WHConsed<T>) {
-    let prev = self.table.insert(key, wconsed) ;
-    debug_assert!(
-      match prev {
-        None => true,
-        Some(prev) => prev.to_hconsed().is_none(),
-      }
-    )
-  }
+    /// Inserts in the consign.
+    ///
+    /// One of the following must hold:
+    ///
+    /// - `self.table` is not defined at `key`
+    /// - the weak ref in `self.table` at `key` returns `None` when upgraded.
+    ///
+    /// This is checked in `debug` but not `release`.
+    #[inline]
+    fn insert(&mut self, key: T, wconsed: WHConsed<T>) {
+        let prev = self.table.insert(key, wconsed);
+        debug_assert!(match prev {
+            None => true,
+            Some(prev) => prev.to_hconsed().is_none(),
+        })
+    }
 
-  /// Attempts to retrieve an *upgradable* value from the map.
-  #[inline]
-  fn get(& self, key: & T) -> Option<HConsed<T>> {
-    if let Some(old) = self.table.get(key) {
-      old.to_hconsed()
-    } else { None }
-  }
+    /// Attempts to retrieve an *upgradable* value from the map.
+    #[inline]
+    fn get(&self, key: &T) -> Option<HConsed<T>> {
+        if let Some(old) = self.table.get(key) {
+            old.to_hconsed()
+        } else {
+            None
+        }
+    }
 }
 
 impl<T: Hash + Eq + Clone> fmt::Display for HConsign<T>
-where T: Hash + fmt::Display {
-  fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-    try!( write!(fmt, "consign:") ) ;
-    for e in self.table.values() {
-      try!( write!(fmt, "\n  | {}", e) ) ;
+where
+    T: Hash + fmt::Display,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(fmt, "consign:"));
+        for e in self.table.values() {
+            try!(write!(fmt, "\n  | {}", e));
+        }
+        Ok(())
     }
-    Ok(())
-  }
 }
-
 
 /// HConsed element creation.
 ///
 /// Implemented *via* a trait to be able to extend `RwLock` for lazy static
 /// consigns.
 pub trait HashConsign<T: Hash>: Sized {
-  /// Hashconses something and returns the hash consed version.
-  ///
-  /// Returns `true` iff the element
-  ///
-  /// - was not in the consign at all, or
-  /// - was in the consign but it is not referenced (weak ref cannot be
-  ///   upgraded.)
-  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) ;
-  /// Creates a HConsed element.
-  fn mk(self, elm: T) -> HConsed<T> {
-    self.mk_is_new(elm).0
-  }
-}
-impl<'a, T: Hash + Eq + Clone> HashConsign<T> for & 'a mut HConsign<T> {
-  /// Hash conses something and returns the hash consed version.
-  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
-    // If the element is known and upgradable return it.
-    if let Some(hconsed) = self.get(& elm) {
-      debug_assert!(
-        * hconsed.elm == elm
-      ) ;
-      return (hconsed.clone(), false)
+    /// Hashconses something and returns the hash consed version.
+    ///
+    /// Returns `true` iff the element
+    ///
+    /// - was not in the consign at all, or
+    /// - was in the consign but it is not referenced (weak ref cannot be
+    ///   upgraded.)
+    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool);
+    /// Creates a HConsed element.
+    fn mk(self, elm: T) -> HConsed<T> {
+        self.mk_is_new(elm).0
     }
-    // Otherwise build hconsed version.
-    let hconsed = HConsed {
-      elm: Arc::new( elm.clone() ),
-      uid: self.count,
-    } ;
-    // Increment uid count.
-    self.count += 1 ;
-    // ...add weak version to the table...
-    self.insert(elm, hconsed.to_weak()) ;
-    // ...and return consed version.
-    (hconsed, true)
-  }
 }
-impl<
-  'a, T: Hash + Eq + Clone
-> HashConsign<T> for & 'a RwLock< HConsign<T> > {
-  /// If the element is already in the consign, only read access will be
-  /// requested.
-  fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
-    // Request read and check if element already exists.
-    {
-      let slf = self.read().unwrap() ;
-      // If the element is known and upgradable return it.
-      if let Some(hconsed) = slf.get(& elm) {
-        debug_assert!(
-          * hconsed.elm == elm
-        ) ;
-        return (hconsed, false)
-      }
-    } ;
-    // Otherwise get mutable `self`.
-    let mut slf = self.write().unwrap() ;
-
-    // Someone might have inserted since we checked, check again.
-    if let Some(hconsed) = slf.get(& elm) {
-      debug_assert!(
-        * hconsed.elm == elm
-      ) ;
-      return (hconsed, false)
+impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a mut HConsign<T> {
+    /// Hash conses something and returns the hash consed version.
+    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
+        // If the element is known and upgradable return it.
+        if let Some(hconsed) = self.get(&elm) {
+            debug_assert!(*hconsed.elm == elm);
+            return (hconsed.clone(), false);
+        }
+        // Otherwise build hconsed version.
+        let hconsed = HConsed {
+            elm: Arc::new(elm.clone()),
+            uid: self.count,
+        };
+        // Increment uid count.
+        self.count += 1;
+        // ...add weak version to the table...
+        self.insert(elm, hconsed.to_weak());
+        // ...and return consed version.
+        (hconsed, true)
     }
-
-    // Otherwise build hconsed version.
-    let hconsed = HConsed {
-      elm: Arc::new( elm.clone() ),
-      uid: slf.count,
-    } ;
-    // Increment uid count.
-    slf.count += 1 ;
-    // ...add weak version to the table...
-    slf.insert(elm, hconsed.to_weak()) ;
-    // ...and return consed version.
-    (hconsed, true)
-  }
 }
+impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
+    /// If the element is already in the consign, only read access will be
+    /// requested.
+    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
+        // Request read and check if element already exists.
+        {
+            let slf = self.read().unwrap();
+            // If the element is known and upgradable return it.
+            if let Some(hconsed) = slf.get(&elm) {
+                debug_assert!(*hconsed.elm == elm);
+                return (hconsed, false);
+            }
+        };
+        // Otherwise get mutable `self`.
+        let mut slf = self.write().unwrap();
 
+        // Someone might have inserted since we checked, check again.
+        if let Some(hconsed) = slf.get(&elm) {
+            debug_assert!(*hconsed.elm == elm);
+            return (hconsed, false);
+        }
+
+        // Otherwise build hconsed version.
+        let hconsed = HConsed {
+            elm: Arc::new(elm.clone()),
+            uid: slf.count,
+        };
+        // Increment uid count.
+        slf.count += 1;
+        // ...add weak version to the table...
+        slf.insert(elm, hconsed.to_weak());
+        // ...and return consed version.
+        (hconsed, true)
+    }
+}
 
 #[cfg(test)]
 mod example {
 
-  use std::fmt ;
-  use * ;
-  use self::ActualTerm::* ;
-  use coll::* ;
+    use self::ActualTerm::*;
+    use coll::*;
+    use std::fmt;
+    use *;
 
-  type Term = HConsed<ActualTerm> ;
+    type Term = HConsed<ActualTerm>;
 
-  #[derive(Hash, Clone, PartialEq, Eq)]
-  enum ActualTerm {
-    Var(usize),
-    Lam(Term),
-    App(Term, Term)
-  }
-
-
-  impl fmt::Display for ActualTerm {
-    fn fmt(& self, fmt: & mut fmt::Formatter) -> fmt::Result {
-      match self {
-        & Var(i) => write!(fmt, "v{}", i),
-        & Lam(ref t) => write!(fmt, "({})", t.get()),
-        & App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
-      }
+    #[derive(Hash, Clone, PartialEq, Eq)]
+    enum ActualTerm {
+        Var(usize),
+        Lam(Term),
+        App(Term, Term),
     }
-  }
 
-  trait TermFactory {
-    fn var(& mut self, v: usize) -> Term ;
-    fn lam(& mut self, t: Term) -> Term ;
-    fn app(& mut self, u: Term, v: Term) -> Term ;
-  }
-
-
-  impl TermFactory for HConsign<ActualTerm> {
-    fn var(& mut self, v: usize) -> Term { self.mk( Var(v) ) }
-    fn lam(& mut self, t: Term) -> Term { self.mk( Lam(t) ) }
-    fn app(& mut self, u: Term, v: Term) -> Term {
-      self.mk( App(u, v) )
+    impl fmt::Display for ActualTerm {
+        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                &Var(i) => write!(fmt, "v{}", i),
+                &Lam(ref t) => write!(fmt, "({})", t.get()),
+                &App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
+            }
+        }
     }
-  }
 
-  #[test]
-  fn run() {
-    let mut consign = HConsign::empty() ;
-    assert_eq!(consign.len(), 0) ;
-
-    let mut map: HConMap<Term,_> = HConMap::with_capacity(100) ;
-    let mut set: HConSet<Term> = HConSet::with_capacity(100) ;
-
-    let (v1, v1_name) = (
-      consign.var(0), "v1"
-    ) ;
-    println!("creating {}", v1) ;
-    assert_eq!(consign.len(), 1) ;
-    let prev = map.insert(v1.clone(), v1_name) ;
-    assert_eq!( prev, None ) ;
-    let is_new = set.insert(v1.clone()) ;
-    assert!( is_new ) ;
-
-    let (v2, v2_name) = (
-      consign.var(3), "v2"
-    ) ;
-    println!("creating {}", v2) ;
-    assert_eq!(consign.len(), 2) ;
-    assert_ne!( v1.uid(), v2.uid() ) ;
-    let prev = map.insert(v2.clone(), v2_name) ;
-    assert_eq!( prev, None ) ;
-    let is_new = set.insert(v2.clone()) ;
-    assert!( is_new ) ;
-
-    let (lam, lam_name) = (
-      consign.lam( v2.clone() ), "lam"
-    ) ;
-    println!("creating {}", lam) ;
-    assert_eq!(consign.len(), 3) ;
-    assert_ne!( v1.uid(), lam.uid() ) ;
-    assert_ne!( v2.uid(), lam.uid() ) ;
-    let prev = map.insert(lam.clone(), lam_name) ;
-    assert_eq!( prev, None ) ;
-    let is_new = set.insert(lam.clone()) ;
-    assert!( is_new ) ;
-
-    let (v3, v3_name) = (
-      consign.var(3), "v3"
-    ) ;
-    println!("creating {}", v3) ;
-    assert_eq!(consign.len(), 3) ;
-    assert_eq!( v2.uid(), v3.uid() ) ;
-    let prev = map.insert(v3.clone(), v3_name) ;
-    assert_eq!( prev, Some(v2_name) ) ;
-    let is_new = set.insert(v3.clone()) ;
-    assert!( ! is_new ) ;
-
-    let (lam2, lam2_name) = (
-      consign.lam( v3.clone() ), "lam2"
-    ) ;
-    println!("creating {}", lam2) ;
-    assert_eq!(consign.len(), 3) ;
-    assert_eq!( lam.uid(), lam2.uid() ) ;
-    let prev = map.insert(lam2.clone(), lam2_name) ;
-    assert_eq!( prev, Some(lam_name) ) ;
-    let is_new = set.insert(lam2.clone()) ;
-    assert!( ! is_new ) ;
-
-    let (app, app_name) = (
-      consign.app(lam2, v1), "app"
-    ) ;
-    println!("creating {}", app) ;
-    assert_eq!(consign.len(), 4) ;
-    let prev = map.insert(app.clone(), app_name) ;
-    assert_eq!( prev, None ) ;
-    let is_new = set.insert(app.clone()) ;
-    assert!( is_new ) ;
-
-    for term in & set {
-      assert!( map.contains_key(term) )
+    trait TermFactory {
+        fn var(&mut self, v: usize) -> Term;
+        fn lam(&mut self, t: Term) -> Term;
+        fn app(&mut self, u: Term, v: Term) -> Term;
     }
-    for (term, val) in & map {
-      println!("looking for `{}`", val) ;
-      assert!( set.contains(term) )
+
+    impl TermFactory for HConsign<ActualTerm> {
+        fn var(&mut self, v: usize) -> Term {
+            self.mk(Var(v))
+        }
+        fn lam(&mut self, t: Term) -> Term {
+            self.mk(Lam(t))
+        }
+        fn app(&mut self, u: Term, v: Term) -> Term {
+            self.mk(App(u, v))
+        }
     }
-  }
+
+    #[test]
+    fn run() {
+        let mut consign = HConsign::empty();
+        assert_eq!(consign.len(), 0);
+
+        let mut map: HConMap<Term, _> = HConMap::with_capacity(100);
+        let mut set: HConSet<Term> = HConSet::with_capacity(100);
+
+        let (v1, v1_name) = (consign.var(0), "v1");
+        println!("creating {}", v1);
+        assert_eq!(consign.len(), 1);
+        let prev = map.insert(v1.clone(), v1_name);
+        assert_eq!(prev, None);
+        let is_new = set.insert(v1.clone());
+        assert!(is_new);
+
+        let (v2, v2_name) = (consign.var(3), "v2");
+        println!("creating {}", v2);
+        assert_eq!(consign.len(), 2);
+        assert_ne!(v1.uid(), v2.uid());
+        let prev = map.insert(v2.clone(), v2_name);
+        assert_eq!(prev, None);
+        let is_new = set.insert(v2.clone());
+        assert!(is_new);
+
+        let (lam, lam_name) = (consign.lam(v2.clone()), "lam");
+        println!("creating {}", lam);
+        assert_eq!(consign.len(), 3);
+        assert_ne!(v1.uid(), lam.uid());
+        assert_ne!(v2.uid(), lam.uid());
+        let prev = map.insert(lam.clone(), lam_name);
+        assert_eq!(prev, None);
+        let is_new = set.insert(lam.clone());
+        assert!(is_new);
+
+        let (v3, v3_name) = (consign.var(3), "v3");
+        println!("creating {}", v3);
+        assert_eq!(consign.len(), 3);
+        assert_eq!(v2.uid(), v3.uid());
+        let prev = map.insert(v3.clone(), v3_name);
+        assert_eq!(prev, Some(v2_name));
+        let is_new = set.insert(v3.clone());
+        assert!(!is_new);
+
+        let (lam2, lam2_name) = (consign.lam(v3.clone()), "lam2");
+        println!("creating {}", lam2);
+        assert_eq!(consign.len(), 3);
+        assert_eq!(lam.uid(), lam2.uid());
+        let prev = map.insert(lam2.clone(), lam2_name);
+        assert_eq!(prev, Some(lam_name));
+        let is_new = set.insert(lam2.clone());
+        assert!(!is_new);
+
+        let (app, app_name) = (consign.app(lam2, v1), "app");
+        println!("creating {}", app);
+        assert_eq!(consign.len(), 4);
+        let prev = map.insert(app.clone(), app_name);
+        assert_eq!(prev, None);
+        let is_new = set.insert(app.clone());
+        assert!(is_new);
+
+        for term in &set {
+            assert!(map.contains_key(term))
+        }
+        for (term, val) in &map {
+            println!("looking for `{}`", val);
+            assert!(set.contains(term))
+        }
+    }
 }
