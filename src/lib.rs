@@ -99,7 +99,7 @@
 //!
 //! Users are free to use the consign however they see fit: one can create a factory directly as in
 //! the example above, but passing it around everywhere it's needed is tedious. The author
-//! recommends the following workflow instead. It relies on the [`new_consign`] macro which creates
+//! recommends the following workflow instead. It relies on the [`consign`] macro which creates
 //! a [lazy static] factory protected by a `RwLock` for thread-safety. The consign and the
 //! constructors are wrapped in an appropriately named module. The consign is invisible and
 //! creating terms is easy.
@@ -118,7 +118,7 @@
 //!         App(Term, Term)
 //!     }
 //!
-//!     new_consign! {
+//!     consign! {
 //!         /// Factory for terms.
 //!         let factory = consign(37) for ActualTerm ;
 //!     }
@@ -159,7 +159,7 @@
 //! #         App(Term, Term)
 //! #     }
 //! #
-//! #     new_consign! {
+//! #     consign! {
 //! #         /// Factory for terms.
 //! #         let factory = consign(37) for ActualTerm ;
 //! #     }
@@ -208,7 +208,7 @@
 //! [`HConMap`]: coll/struct.HConMap.html (HConMap documentation)
 //! [`HashConsign` trait]: trait.HashConsign.html (HashConsign trait)
 //! [`HConsign`]: struct.HConsign.html (HConsign type)
-//! [`new_consign`]: macro.new_consign.html (new_consign macro)
+//! [`consign`]: macro.consign.html (consign macro)
 //! [coll mod]: coll/index.html (coll module documentation)
 //! [lazy static]: https://crates.io/crates/lazy_static
 //! (lazy_static library on crates.io)
@@ -234,7 +234,7 @@ pub use lazy_static::*;
 /// - `$typ:typ,` type being hashconsed (the underlying type, not the
 ///     hashconsed one) ;
 #[macro_export]
-macro_rules! new_consign {
+macro_rules! consign {
     (
         $(#[$meta:meta])*
         let $name:ident = consign($capa:expr) for $typ:ty ;
@@ -251,53 +251,6 @@ macro_rules! new_consign {
 }
 
 pub mod coll;
-
-/// Creates a hash-cons container for a type.
-#[macro_export]
-macro_rules! new_hconsed {
-    (
-        $(
-            $(#[$meta:meta])*
-            $ty:ident for $inner:ty ;
-        )*
-    ) => ({
-        mod obscure_hashcons_module {$(
-            $(#[$meta])*
-            pub struct $ident {
-                /// Inner element.
-                elm: $inner,
-                /// Uid of the element.
-                uid: u64,
-            }
-            impl $crate::HashConsed for $ty {
-                type inner = $inner;
-            }
-            impl $ident {
-                /// The inner element. Can also be accessed *via* dereferencing.
-                #[inline]
-                pub fn get(&self) -> &$inner {
-                    self.elm.deref()
-                }
-                /// The unique identifier of the element.
-                #[inline]
-                pub fn uid(&self) -> u64 {
-                    self.uid
-                }
-                /// Turns a hashconsed value in a weak hashconsed value.
-                #[inline]
-                pub fn to_weak(&self) -> WHConsed<$inner> {
-                    $crate::WHConsed {
-                        elm: Arc::downgrade(&self.elm),
-                        uid: self.uid,
-                    }
-                }
-            }
-        )*}
-        pub use obscure_hashcons_module::{
-            $($ty),*
-        };
-    });
-}
 
 /// Internal trait used to recognize hashconsed things.
 ///
