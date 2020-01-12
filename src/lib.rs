@@ -239,7 +239,7 @@ macro_rules! consign {
         $(#[$meta:meta])*
         let $name:ident = consign($capa:expr) for $typ:ty ;
     ) => (
-        lazy_static! {
+        $crate::lazy_static! {
             $(#[$meta])*
             static ref $name: ::std::sync::RwLock<
                 $crate::HConsign<$typ>
