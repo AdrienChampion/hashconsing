@@ -1,13 +1,13 @@
 [package]
 name = "hashconsing"
-version = "1.0.1"
+version = "1.1.0"
 authors = ["Adrien Champion <adrien.champion@email.com>"]
 description = "A hash consing library."
 documentation = "https://docs.rs/hashconsing"
 homepage = "https://github.com/AdrienChampion/hashconsing"
 repository = "https://github.com/AdrienChampion/hashconsing"
 readme = "README.md"
-categories = ["caching", "concurrency", "memory-management", ]
+categories = ["caching", "compression", "concurrency", "data-structures", "memory-management", ]
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
 edition = "2018"
@@ -18,4 +18,9 @@ appveyor = { repository = "AdrienChampion/hashconsing" }
 codecov = { repository = "AdrienChampion/hashconsing", service = "github" }
 
 [dependencies]
-lazy_static="1.*"
+lazy_static = "1.*"
+
+[dev-dependencies]
+crossbeam-utils = "^0.8"
+trybuild = "^1.0"
+rayon = "^1.5"

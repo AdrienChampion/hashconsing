@@ -1,3 +1,8 @@
+v1.1.0
+
+- removed systematic unsafe implementations of `Send` and `Sync` for `HConsed`,
+    see [issue 1](https://github.com/AdrienChampion/hashconsing/issues/1)
+
 v1.0.1
 
 - fixed path bug with `lazy_static` in `consign` macro

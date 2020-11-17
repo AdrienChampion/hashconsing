@@ -213,13 +213,14 @@
 //! [lazy static]: https://crates.io/crates/lazy_static
 //! (lazy_static library on crates.io)
 
-use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
-use std::collections::HashMap;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::marker::{Send, Sync};
-use std::ops::Deref;
-use std::sync::{Arc, RwLock, Weak};
+use std::{
+    cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
+    collections::HashMap,
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    sync::{Arc, RwLock, Weak},
+};
 
 pub use lazy_static::*;
 
@@ -261,8 +262,7 @@ pub trait HashConsed {
     type Inner;
 }
 
-/// Stores a hash consed element and its hash in order to avoid recomputing it
-/// every time.
+/// A hashconsed value.
 pub struct HConsed<T> {
     /// The actual element.
     elm: Arc<T>,
@@ -350,9 +350,6 @@ impl<T> Deref for HConsed<T> {
         self.elm.deref()
     }
 }
-
-unsafe impl<T> Sync for HConsed<T> {}
-unsafe impl<T> Send for HConsed<T> {}
 
 impl<T: fmt::Display> fmt::Display for HConsed<T> {
     #[inline]

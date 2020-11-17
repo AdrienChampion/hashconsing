@@ -6,9 +6,8 @@
 
 `hashconsing` is a hash consing library in Rust.
 
-It is based on [Type-Safe Modular Hash-Consing][paper] by Filiâtre and Conchon.
-It is slightly less efficient as uses Rust's `HashMap`s, not a custom built
-structure.
+It is based on [Type-Safe Modular Hash-Consing][paper] by Filliâtre and Conchon. It is slightly less
+efficient as uses Rust's `HashMap`s, not a custom built structure.
 
 For more details see [the documentation][doc].
 
