@@ -4,6 +4,12 @@ v1.2.0
 - added a `capacity` method on the consign
 - added `collect`, `shrink_to_fit`, `collect_to_fit` and `reserve` to the `HashConsign` trait
 
+# Breaking Changes (Kinda)
+
+The previous version was exposing too much from `lazy_static` which was a mistake. Only the
+`lazy_static` macro is re-exported now, other items such as the `__Deref` trait are not re-exported
+anymore.
+
 v1.1.0
 
 - removed systematic unsafe implementations of `Send` and `Sync` for `HConsed`,
