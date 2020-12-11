@@ -2,7 +2,8 @@ v1.2.0
 
 - cleaned `lazy_static` re-export, now only re-exporting `lazy_static` macro
 - added a `capacity` method on the consign
-- added `collect`, `shrink_to_fit`, `collect_to_fit` and `reserve` to the `HashConsign` trait
+- added `collect`, `shrink_to_fit`, `collect_to_fit` and `reserve` to the `HashConsign` trait,
+    see [issue 2](https://github.com/AdrienChampion/hashconsing/issues/2)
 
 # Breaking Changes (Kinda)
 
