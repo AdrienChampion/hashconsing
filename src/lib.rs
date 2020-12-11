@@ -8,7 +8,7 @@
 
 //! Hash consing library.
 //!
-//! This library is based on [Type-Safe Modular Hash-Consing](paper) by Filiâtre and Conchon. It is
+//! This library is based on [Type-Safe Modular Hash-Consing][paper] by Filiâtre and Conchon. It is
 //! probably less efficient as uses Rust's `HashMap`s, not a custom built structure.
 //!
 //! If you are not familiar with hashconsing, see the [example](#example) below or read the paper.
@@ -222,7 +222,7 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
-pub use lazy_static::*;
+pub use lazy_static::lazy_static;
 
 /// Creates a lazy static consign.
 ///
