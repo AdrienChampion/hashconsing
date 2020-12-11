@@ -6,15 +6,15 @@ warning: unused import: `HConsed`
   |
   = note: `#[warn(unused_imports)]` on by default
 
-error[E0277]: `std::cell::Cell<RefOrInt<'_>>` cannot be shared between threads safely
+error[E0277]: `Cell<RefOrInt<'_>>` cannot be shared between threads safely
   --> $DIR/issue_1.rs:37:11
    |
 37 |         s.spawn(move |_| {
-   |           ^^^^^ `std::cell::Cell<RefOrInt<'_>>` cannot be shared between threads safely
+   |           ^^^^^ `Cell<RefOrInt<'_>>` cannot be shared between threads safely
    |
-   = help: within `HashableCell<RefOrInt<'_>>`, the trait `std::marker::Sync` is not implemented for `std::cell::Cell<RefOrInt<'_>>`
+   = help: within `HashableCell<RefOrInt<'_>>`, the trait `Sync` is not implemented for `Cell<RefOrInt<'_>>`
    = note: required because it appears within the type `HashableCell<RefOrInt<'_>>`
-   = note: required because of the requirements on the impl of `std::marker::Send` for `&HashableCell<RefOrInt<'_>>`
-   = note: required because of the requirements on the impl of `std::marker::Send` for `std::sync::Arc<&HashableCell<RefOrInt<'_>>>`
-   = note: required because it appears within the type `hashconsing::HConsed<&HashableCell<RefOrInt<'_>>>`
-   = note: required because it appears within the type `[closure@$DIR/tests/try_build/issue_1.rs:37:17: 45:10 hcons_cell_ref:hashconsing::HConsed<&HashableCell<RefOrInt<'_>>>]`
+   = note: required because of the requirements on the impl of `Send` for `&HashableCell<RefOrInt<'_>>`
+   = note: required because of the requirements on the impl of `Send` for `Arc<&HashableCell<RefOrInt<'_>>>`
+   = note: required because it appears within the type `HConsed<&HashableCell<RefOrInt<'_>>>`
+   = note: required because it appears within the type `[closure@$DIR/tests/try_build/issue_1.rs:37:17: 45:10]`
