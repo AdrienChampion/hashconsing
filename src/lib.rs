@@ -222,7 +222,12 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 
+pub extern crate lazy_static;
+
 pub use lazy_static::lazy_static;
+
+#[cfg(test)]
+mod test;
 
 /// Creates a lazy static consign.
 ///
@@ -480,6 +485,12 @@ impl<T: Hash + Eq + Clone> HConsign<T> {
     pub fn len(&self) -> usize {
         self.table.len()
     }
+    /// Capacity of the underlying hashtable, mostly for testing.
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.table.capacity()
+    }
+
     /// True if the consign is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -540,13 +551,28 @@ pub trait HashConsign<T: Hash>: Sized {
     /// - was in the consign but it is not referenced (weak ref cannot be
     ///   upgraded.)
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool);
+
     /// Creates a HConsed element.
     fn mk(self, elm: T) -> HConsed<T> {
         self.mk_is_new(elm).0
     }
+
+    /// Removes *dead* elements from the consign.
+    ///
+    /// An element is *dead* if it is not being referenced outside of the consign, meaning it is not
+    /// reachable anymore.
+    fn collect(self);
+
+    /// Shrinks the capacity of the consign as much as possible.
+    fn shrink_to_fit(self);
+
+    /// Calls [`collect`](#tymethod.collect) and [`shrink_to_fit`](#tymethod.shrink_to_fit).
+    fn collect_to_fit(self);
+
+    /// Reserves capacity for at least `additional` more elements.
+    fn reserve(self, additional: usize);
 }
 impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a mut HConsign<T> {
-    /// Hash conses something and returns the hash consed version.
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
         // If the element is known and upgradable return it.
         if let Some(hconsed) = self.get(&elm) {
@@ -565,14 +591,67 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a mut HConsign<T> {
         // ...and return consed version.
         (hconsed, true)
     }
+
+    fn collect(self) {
+        let mut old_len = self.table.len() + 1;
+        let mut max_uid = None;
+        while old_len != self.table.len() {
+            old_len = self.table.len();
+            max_uid = None;
+
+            self.table.retain(|_key, val| {
+                if val.elm.strong_count() > 0 {
+                    let max = max_uid.get_or_insert(val.uid);
+                    if *max < val.uid {
+                        *max = val.uid
+                    }
+                    true
+                } else {
+                    false
+                }
+            });
+        }
+        if self.table.is_empty() {
+            self.count = 0
+        } else if let Some(max) = max_uid {
+            self.count = max + 1
+        }
+    }
+
+    fn shrink_to_fit(self) {
+        self.table.shrink_to_fit()
+    }
+
+    fn collect_to_fit(self) {
+        self.collect();
+        self.shrink_to_fit();
+    }
+
+    fn reserve(self, additional: usize) {
+        self.table.reserve(additional)
+    }
 }
+
+/// Helper macro to get a read or write version of a locked consign.
+macro_rules! get {
+    { read on $consign:expr } => {
+        get! { @expect $consign.read() }
+    };
+    { write on $consign:expr } => {
+        get! { @expect $consign.write() }
+    };
+    { @expect $e:expr } => {
+        $e.expect("[hashconsing] global consign is poisoned")
+    };
+}
+
 impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
     /// If the element is already in the consign, only read access will be
     /// requested.
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
         // Request read and check if element already exists.
         {
-            let slf = self.read().unwrap();
+            let slf = get!(read on self);
             // If the element is known and upgradable return it.
             if let Some(hconsed) = slf.get(&elm) {
                 debug_assert!(*hconsed.elm == elm);
@@ -580,7 +659,7 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
             }
         };
         // Otherwise get mutable `self`.
-        let mut slf = self.write().unwrap();
+        let mut slf = get!(write on self);
 
         // Someone might have inserted since we checked, check again.
         if let Some(hconsed) = slf.get(&elm) {
@@ -600,120 +679,17 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
         // ...and return consed version.
         (hconsed, true)
     }
-}
 
-#[cfg(test)]
-mod example {
-
-    use crate::coll::*;
-    use crate::example::ActualTerm::*;
-    use crate::*;
-    use std::fmt;
-
-    type Term = HConsed<ActualTerm>;
-
-    #[derive(Hash, Clone, PartialEq, Eq)]
-    enum ActualTerm {
-        Var(usize),
-        Lam(Term),
-        App(Term, Term),
+    fn collect(self) {
+        get!(write on self).collect()
     }
-
-    impl fmt::Display for ActualTerm {
-        fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-            match self {
-                &Var(i) => write!(fmt, "v{}", i),
-                &Lam(ref t) => write!(fmt, "({})", t.get()),
-                &App(ref u, ref v) => write!(fmt, "{}.{}", u.get(), v.get()),
-            }
-        }
+    fn shrink_to_fit(self) {
+        get!(write on self).shrink_to_fit()
     }
-
-    trait TermFactory {
-        fn var(&mut self, v: usize) -> Term;
-        fn lam(&mut self, t: Term) -> Term;
-        fn app(&mut self, u: Term, v: Term) -> Term;
+    fn collect_to_fit(self) {
+        get!(write on self).collect_to_fit()
     }
-
-    impl TermFactory for HConsign<ActualTerm> {
-        fn var(&mut self, v: usize) -> Term {
-            self.mk(Var(v))
-        }
-        fn lam(&mut self, t: Term) -> Term {
-            self.mk(Lam(t))
-        }
-        fn app(&mut self, u: Term, v: Term) -> Term {
-            self.mk(App(u, v))
-        }
-    }
-
-    #[test]
-    fn run() {
-        let mut consign = HConsign::empty();
-        assert_eq!(consign.len(), 0);
-
-        let mut map: HConMap<Term, _> = HConMap::with_capacity(100);
-        let mut set: HConSet<Term> = HConSet::with_capacity(100);
-
-        let (v1, v1_name) = (consign.var(0), "v1");
-        println!("creating {}", v1);
-        assert_eq!(consign.len(), 1);
-        let prev = map.insert(v1.clone(), v1_name);
-        assert_eq!(prev, None);
-        let is_new = set.insert(v1.clone());
-        assert!(is_new);
-
-        let (v2, v2_name) = (consign.var(3), "v2");
-        println!("creating {}", v2);
-        assert_eq!(consign.len(), 2);
-        assert_ne!(v1.uid(), v2.uid());
-        let prev = map.insert(v2.clone(), v2_name);
-        assert_eq!(prev, None);
-        let is_new = set.insert(v2.clone());
-        assert!(is_new);
-
-        let (lam, lam_name) = (consign.lam(v2.clone()), "lam");
-        println!("creating {}", lam);
-        assert_eq!(consign.len(), 3);
-        assert_ne!(v1.uid(), lam.uid());
-        assert_ne!(v2.uid(), lam.uid());
-        let prev = map.insert(lam.clone(), lam_name);
-        assert_eq!(prev, None);
-        let is_new = set.insert(lam.clone());
-        assert!(is_new);
-
-        let (v3, v3_name) = (consign.var(3), "v3");
-        println!("creating {}", v3);
-        assert_eq!(consign.len(), 3);
-        assert_eq!(v2.uid(), v3.uid());
-        let prev = map.insert(v3.clone(), v3_name);
-        assert_eq!(prev, Some(v2_name));
-        let is_new = set.insert(v3.clone());
-        assert!(!is_new);
-
-        let (lam2, lam2_name) = (consign.lam(v3.clone()), "lam2");
-        println!("creating {}", lam2);
-        assert_eq!(consign.len(), 3);
-        assert_eq!(lam.uid(), lam2.uid());
-        let prev = map.insert(lam2.clone(), lam2_name);
-        assert_eq!(prev, Some(lam_name));
-        let is_new = set.insert(lam2.clone());
-        assert!(!is_new);
-
-        let (app, app_name) = (consign.app(lam2, v1), "app");
-        println!("creating {}", app);
-        assert_eq!(consign.len(), 4);
-        let prev = map.insert(app.clone(), app_name);
-        assert_eq!(prev, None);
-        let is_new = set.insert(app.clone());
-        assert!(is_new);
-
-        for term in &set {
-            assert!(map.contains_key(term))
-        }
-        for (term, val) in &map {
-            println!("looking for `{}`", val);
-            assert!(set.contains(term))
-        }
+    fn reserve(self, additional: usize) {
+        get!(write on self).reserve(additional)
     }
 }
