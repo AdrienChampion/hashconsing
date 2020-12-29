@@ -1,6 +1,6 @@
 ![crates.io](https://img.shields.io/crates/v/hashconsing.svg)
 ![Documentation](https://docs.rs/hashconsing/badge.svg)
-![CI status](https://github.com/actions/hashconsing/workflows/.github/workflows/rust.yml/badge.svg)
+![ci](https://github.com/AdrienChampion/hashconsing/workflows/ci/badge.svg)
 
 
 # `hashconsing`
