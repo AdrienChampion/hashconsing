@@ -1,8 +1,11 @@
+![crates.io](https://img.shields.io/crates/v/hashconsing.svg)
+![Documentation](https://docs.rs/hashconsing/badge.svg)
 ![CI status](https://github.com/actions/hashconsing/workflows/.github/workflows/rust.yml/badge.svg)
+
 
 # `hashconsing`
 
-`hashconsing` is a hash consing library in Rust.
+`hashconsing` is a Rust hash consing library.
 
 It is based on [Type-Safe Modular Hash-Consing][paper] by Filliâtre and Conchon. It is slightly less
 efficient as uses Rust's `HashMap`s, not a custom built structure.
