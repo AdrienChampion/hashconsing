@@ -291,7 +291,7 @@ impl<T> HConsed<T> {
     }
     /// Turns a hashconsed thing in a weak hashconsed thing.
     #[inline]
-    fn to_weak(&self) -> WHConsed<T> {
+    pub fn to_weak(&self) -> WHConsed<T> {
         WHConsed {
             elm: Arc::downgrade(&self.elm),
             uid: self.uid,
