@@ -364,7 +364,7 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
 }
 
 /// Weak version of `HConsed` (internal).
-struct WHConsed<T> {
+pub struct WHConsed<T> {
     /// The actual element.
     elm: Weak<T>,
     /// Unique identifier of the element.
