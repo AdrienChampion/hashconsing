@@ -23,7 +23,7 @@ MIT/Apache-2.0
 
 # Contributors
 
-- @alex-ozdemir
+- [@alex-ozdemir](https://github.com/alex-ozdemir)
 
 [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880 (Conchon et al.)
 [doc]: https://docs.rs/hashconsing (hashconsing documentation)
