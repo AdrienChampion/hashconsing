@@ -1,3 +1,7 @@
+v1.3.0
+
+- publicized the weak reference API, thanks @alex-ozdemir!
+
 v1.2.0
 
 - cleaned `lazy_static` re-export, now only re-exporting `lazy_static` macro
