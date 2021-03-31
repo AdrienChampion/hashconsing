@@ -453,7 +453,9 @@ mod hash {
     }
     impl Hasher for HashU64 {
         fn finish(&self) -> u64 {
-            unsafe { ::std::mem::transmute(self.buf) }
+            let block: u64 = unsafe { ::std::mem::transmute(self.buf) };
+            // Multiply by random 64-bit prime to distribute
+            block.wrapping_mul(0xDA5DF7A7BD02F2C7u64)
         }
         fn write(&mut self, bytes: &[u8]) {
             Self::test_bytes(bytes);
