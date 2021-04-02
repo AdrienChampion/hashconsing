@@ -101,7 +101,7 @@
 //!
 //! ```
 //! use hashconsing::*;
-//! use hashconsing::coll*;
+//! use hashconsing::coll::*;
 //! use std::collections::hash_map::RandomState
 //!
 //! #[derive(Hash,PartialEq,Eq)]
