@@ -237,6 +237,8 @@ mod test;
 /// - `$(#[$meta:meta])*` meta stuff, typically comments ;
 /// - `$name:ident` name of the consign ;
 /// - `$capa:expr` initial capacity when creating the consign ;
+/// - `$hash_builder:expr` optional hash builder, an
+///   implementation of [`std::hash::BuildHasher`] ;
 /// - `$typ:typ,` type being hashconsed (the underlying type, not the
 ///     hashconsed one) ;
 #[macro_export]
@@ -251,6 +253,19 @@ macro_rules! consign {
                 $crate::HConsign<$typ>
             > = ::std::sync::RwLock::new(
                 $crate::HConsign::with_capacity( $capa )
+            );
+        }
+    );
+    (
+        $(#[$meta:meta])*
+        let $name:ident = consign($capa:expr,$hash_builder:expr) for $typ:ty ;
+    ) => (
+        $crate::lazy_static! {
+            $(#[$meta])*
+            static ref $name: ::std::sync::RwLock<
+                $crate::HConsign<$typ>
+            > = ::std::sync::RwLock::new(
+                $crate::HConsign::with_capacity_and_hasher( $capa, $hash_builder )
             );
         }
     );
