@@ -102,9 +102,9 @@
 //! ```
 //! use hashconsing::*;
 //! use hashconsing::coll::*;
-//! use std::collections::hash_map::RandomState
+//! use std::collections::hash_map::RandomState;
 //!
-//! #[derive(Hash,PartialEq,Eq)]
+//! #[derive(Hash,PartialEq,Eq,Clone)]
 //! struct ActualSum(Vec<Sum>);
 //! type Sum = HConsed<ActualSum>;
 //!
