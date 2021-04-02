@@ -49,10 +49,7 @@ impl fmt::Display for ActualTerm {
 
 impl ActualTerm {
     fn new(op: Op, children: Vec<Term>) -> ActualTerm {
-        ActualTerm {
-            op,
-            children,
-        }
+        ActualTerm { op, children }
     }
 }
 
@@ -122,7 +119,17 @@ impl rand::distributions::Distribution<Term> for TermDist {
         let ns = Sum(o.arity(), excess).sample(rng);
         let subterms = ns
             .into_iter()
-            .map(|n| TermDist::new(n + 1, if o == Op::Lam { self.binding_depth + 1 } else { self.binding_depth }).sample(rng))
+            .map(|n| {
+                TermDist::new(
+                    n + 1,
+                    if o == Op::Lam {
+                        self.binding_depth + 1
+                    } else {
+                        self.binding_depth
+                    },
+                )
+                .sample(rng)
+            })
             .collect::<Vec<_>>();
         TERMS.mk(ActualTerm::new(o, subterms))
     }
@@ -169,16 +176,14 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use test::{Bencher, black_box};
     use super::*;
     use rand::distributions::Distribution;
+    use test::{black_box, Bencher};
 
     #[bench]
     fn bench_traversal(b: &mut Bencher) {
         let rng = &mut rand::thread_rng();
         let t = TermDist::fn_of_size(TERM_SIZE).sample(rng);
-        b.iter(|| {
-            black_box(PostOrderIter::new(t.clone()).count())
-        });
+        b.iter(|| black_box(PostOrderIter::new(t.clone()).count()));
     }
 }

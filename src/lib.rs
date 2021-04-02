@@ -217,7 +217,7 @@ use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     collections::{hash_map::RandomState, HashMap},
     fmt,
-    hash::{Hash, Hasher, BuildHasher},
+    hash::{BuildHasher, Hash, Hasher},
     ops::Deref,
     sync::{Arc, RwLock, Weak},
 };

@@ -122,7 +122,7 @@
 //! This crate uses a simple hash by default (multiplies the identifier by a large prime).
 
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher, BuildHasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
 use self::hash::BuildHashU64;
@@ -146,7 +146,7 @@ impl<T, S> PartialEq for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
-    S: BuildHasher
+    S: BuildHasher,
 {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.iter().zip(other.iter()).all(|(e_1, e_2)| e_1 == e_2)
@@ -157,7 +157,7 @@ impl<T, S> Eq for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
-    S: BuildHasher
+    S: BuildHasher,
 {
 }
 
@@ -165,7 +165,7 @@ impl<T, S> Hash for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
-    S: BuildHasher
+    S: BuildHasher,
 {
     fn hash<H>(&self, h: &mut H)
     where
@@ -215,7 +215,7 @@ impl<T, S> HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
-    S: BuildHasher
+    S: BuildHasher,
 {
     /// An empty set of hashconsed things, using a custom hash.
     ///
@@ -308,7 +308,7 @@ impl<T, Src, S> From<Src> for HConSet<HConsed<T>, S>
 where
     T: Hash + Eq,
     Src: Iterator<Item = HConsed<T>>,
-    S: Default + BuildHasher
+    S: Default + BuildHasher,
 {
     fn from(src: Src) -> Self {
         let mut set = HConSet::default();
@@ -338,7 +338,7 @@ where
     T: HashConsed,
     T::Inner: Eq + Hash,
     V: Eq,
-    S: BuildHasher
+    S: BuildHasher,
 {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len()
@@ -354,7 +354,7 @@ where
     T: HashConsed,
     T::Inner: Eq + Hash,
     V: Eq,
-    S: BuildHasher
+    S: BuildHasher,
 {
 }
 
@@ -413,7 +413,7 @@ impl<T, V, S> HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
-    S: BuildHasher
+    S: BuildHasher,
 {
     /// An empty map of hashconsed things, using a custom hash.
     ///
