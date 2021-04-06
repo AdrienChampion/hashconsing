@@ -271,7 +271,12 @@ macro_rules! consign {
     );
 }
 
+#[deprecated(
+    since = "1.4.0",
+    note = "Deprecated for poor performance. We recommend the hash_coll module instead."
+)]
 pub mod coll;
+pub mod hash_coll;
 
 /// Internal trait used to recognize hashconsed things.
 ///
