@@ -1,13 +1,12 @@
-//! Efficient collections for hashconsed data.
+//! Efficient hash collections for hashconsed data.
 //!
-//! This module provide hash set and hash map types with trivial hash functions
-//! for hashconsed types. The hash of an hashconsed value is its unique
-//! identifier, verbatim. This is obviously extremely dangerous from a security
-//! point of view: these collections should **never** be used for cryptographic
-//! purposes.
+//! This module provide hash set and hash map types with simple hash functions for hashconsed
+//! types. The hash of an hashconsed value is its unique identifier, multiplied by a large prime.
+//! This is obviously extremely dangerous from a security point of view: these collections should
+//! **never** be used for cryptographic purposes.
 //!
-//! Note that you can use `BTreeMap` and `BTreeSet` on hashconsed types since
-//! they are totally ordered.
+//! Note that you can also use `BTreeMap` and `BTreeSet` on hashconsed types since they are totally
+//! ordered.
 //!
 //! # Usage
 //!
@@ -37,7 +36,7 @@
 //!
 //! ```
 //! use hashconsing::* ;
-//! use hashconsing::coll::* ;
+//! use hashconsing::hash_coll::* ;
 //!
 //! #[derive(Hash, Clone, PartialEq, Eq)]
 //! enum ActualTerm {
@@ -68,7 +67,7 @@
 //!
 //! ```
 //! use hashconsing::* ;
-//! use hashconsing::coll::* ;
+//! use hashconsing::hash_coll::* ;
 //!
 //! #[derive(Hash, Clone, PartialEq, Eq)]
 //! enum ActualTerm {
@@ -96,44 +95,73 @@
 //! assert!( is_new ) ;
 //! ```
 //!
-//! # Hashing Concerns
+//! One can modify the hash use by term maps and sets, as well as the term map underlying a
+//! consignment.
 //!
-//! This module uses the unique hash-consing identifier as the hash for elements stored in
-//! collections. These identifier are monotonically increasing (and are thus not well-distributed)
-//! causing degraded performance in the Rust standard library's hash table. You can see [this
-//! PR][pr] for more details. We recommend the collections in the [hash_coll](crate::hash_coll) module instead.
+//! ```
+//! use hashconsing::*;
+//! use hashconsing::hash_coll::*;
+//! use std::collections::hash_map::RandomState;
 //!
-//! [pr]: https://github.com/AdrienChampion/hashconsing/pull/8
-
+//! #[derive(Hash,PartialEq,Eq,Clone)]
+//! struct ActualSum(Vec<Sum>);
+//! type Sum = HConsed<ActualSum>;
+//!
+//! consign! {
+//!     /// Factory for terms. Uses the standard library's "SipHash".
+//!     let factory = consign(37, RandomState::new()) for ActualSum ;
+//! }
+//!
+//! fn main() {
+//!     // Map from terms. Uses the standard library's "SipHash".
+//!     let map = HConMap::<Sum, usize, RandomState>::with_hasher(RandomState::new());
+//! }
+//! ```
 use std::collections::{HashMap, HashSet};
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
 use self::hash::BuildHashU64;
 use crate::{HConsed, HashConsed};
 
-/// A hash set of hash-consed things with trivial hashing.
-#[derive(Clone, Debug, Eq)]
-pub struct HConSet<T>
+/// A hash set of hash-consed things.
+///
+/// Its second argument is a [`BuildHasher`] which should be used to construct the hash function
+/// for this set. The default is an in-crate hash function which just multiplies the identifier of
+/// the hash-consed type by a large prime.
+#[derive(Clone, Debug)]
+pub struct HConSet<T, S = BuildHashU64>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
 {
-    set: HashSet<HConsed<T::Inner>, BuildHashU64>,
+    set: HashSet<HConsed<T::Inner>, S>,
 }
-impl<T> PartialEq for HConSet<T>
+
+impl<T, S> PartialEq for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
+    S: BuildHasher,
 {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.iter().zip(other.iter()).all(|(e_1, e_2)| e_1 == e_2)
     }
 }
-impl<T> Hash for HConSet<T>
+
+impl<T, S> Eq for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
+    S: BuildHasher,
+{
+}
+
+impl<T, S> Hash for HConSet<T, S>
+where
+    T: HashConsed,
+    T::Inner: Eq + Hash,
+    S: BuildHasher,
 {
     fn hash<H>(&self, h: &mut H)
     where
@@ -145,19 +173,20 @@ where
     }
 }
 
-impl<T> Default for HConSet<T>
+impl<T, S> Default for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
+    S: Default,
 {
     fn default() -> Self {
         HConSet {
-            set: HashSet::default(),
+            set: HashSet::with_hasher(S::default()),
         }
     }
 }
 
-impl<T> HConSet<T>
+impl<T> HConSet<T, BuildHashU64>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
@@ -176,13 +205,48 @@ where
             set: HashSet::with_capacity_and_hasher(capa, BuildHashU64 {}),
         }
     }
+}
+
+impl<T, S> HConSet<T, S>
+where
+    T: HashConsed,
+    T::Inner: Eq + Hash,
+    S: BuildHasher,
+{
+    /// An empty set of hashconsed things, using a custom hash.
+    ///
+    /// See [`BuildHasher`] for the trait that `build_hasher` must implement, or
+    /// [`HConMap::with_hasher`] for an example.
+    #[inline]
+    pub fn with_hasher(build_hasher: S) -> Self {
+        HConSet {
+            set: HashSet::with_hasher(build_hasher),
+        }
+    }
+    /// An empty set of hashconsed things with a capacity and a custom hash.
+    ///
+    /// See [`BuildHasher`] for the trait that `build_hasher` must implement.
+    #[inline]
+    pub fn with_capacity_and_hasher(capa: usize, build_hasher: S) -> Self {
+        HConSet {
+            set: HashSet::with_capacity_and_hasher(capa, build_hasher),
+        }
+    }
+}
+
+impl<T, S> HConSet<T, S>
+where
+    T: HashConsed,
+    T::Inner: Eq + Hash,
+{
     /// An iterator visiting all elements.
     #[inline]
     pub fn iter(&self) -> ::std::collections::hash_set::Iter<HConsed<T::Inner>> {
         self.set.iter()
     }
 }
-impl<'a, T> IntoIterator for &'a HConSet<T>
+
+impl<'a, T, S> IntoIterator for &'a HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -193,7 +257,7 @@ where
         (&self.set).into_iter()
     }
 }
-impl<T> IntoIterator for HConSet<T>
+impl<T, S> IntoIterator for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -204,10 +268,11 @@ where
         self.set.into_iter()
     }
 }
-impl<T> ::std::iter::FromIterator<HConsed<T::Inner>> for HConSet<T>
+impl<T, S> ::std::iter::FromIterator<HConsed<T::Inner>> for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
+    S: BuildHasher + Default,
 {
     fn from_iter<I: IntoIterator<Item = HConsed<T::Inner>>>(iter: I) -> Self {
         HConSet {
@@ -215,17 +280,17 @@ where
         }
     }
 }
-impl<T> Deref for HConSet<T>
+impl<T, S> Deref for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
 {
-    type Target = HashSet<HConsed<T::Inner>, BuildHashU64>;
+    type Target = HashSet<HConsed<T::Inner>, S>;
     fn deref(&self) -> &Self::Target {
         &self.set
     }
 }
-impl<T> DerefMut for HConSet<T>
+impl<T, S> DerefMut for HConSet<T, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -235,13 +300,14 @@ where
     }
 }
 
-impl<T, Src> From<Src> for HConSet<HConsed<T>>
+impl<T, Src, S> From<Src> for HConSet<HConsed<T>, S>
 where
     T: Hash + Eq,
     Src: Iterator<Item = HConsed<T>>,
+    S: Default + BuildHasher,
 {
     fn from(src: Src) -> Self {
-        let mut set = HConSet::new();
+        let mut set = HConSet::default();
         for elem in src {
             set.insert(elem);
         }
@@ -249,21 +315,26 @@ where
     }
 }
 
-/// A hash map of hash-consed things with trivial hashing.
-#[derive(Clone, Debug, Eq)]
-pub struct HConMap<T, V>
+/// A hash map of hash-consed things.
+///
+/// Its second argument is a [`BuildHasher`] which should be used to construct the hash function
+/// for this set. The default is an in-crate hash function which just multiplies the identifier of
+/// the hash-consed type by a large prime.
+#[derive(Clone, Debug)]
+pub struct HConMap<T, V, S = BuildHashU64>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
 {
-    map: HashMap<HConsed<T::Inner>, V, BuildHashU64>,
+    map: HashMap<HConsed<T::Inner>, V, S>,
 }
 
-impl<T, V> PartialEq for HConMap<T, V>
+impl<T, V, S> PartialEq for HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
     V: Eq,
+    S: BuildHasher,
 {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len()
@@ -273,11 +344,22 @@ where
                 .all(|((k_1, v_1), (k_2, v_2))| k_1 == k_2 && v_1 == v_2)
     }
 }
-impl<T, V> Hash for HConMap<T, V>
+
+impl<T, V, S> Eq for HConMap<T, V, S>
+where
+    T: HashConsed,
+    T::Inner: Eq + Hash,
+    V: Eq,
+    S: BuildHasher,
+{
+}
+
+impl<T, V, S> Hash for HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
     V: Hash,
+    S: BuildHasher,
 {
     fn hash<H>(&self, h: &mut H)
     where
@@ -290,10 +372,11 @@ where
     }
 }
 
-impl<T, V> Default for HConMap<T, V>
+impl<T, V, S> Default for HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
+    S: Default,
 {
     fn default() -> Self {
         HConMap {
@@ -302,7 +385,7 @@ where
     }
 }
 
-impl<T: HashConsed, V> HConMap<T, V>
+impl<T: HashConsed, V> HConMap<T, V, BuildHashU64>
 where
     T::Inner: Hash + Eq,
 {
@@ -320,6 +403,52 @@ where
             map: HashMap::with_capacity_and_hasher(capa, BuildHashU64 {}),
         }
     }
+}
+
+impl<T, V, S> HConMap<T, V, S>
+where
+    T: HashConsed,
+    T::Inner: Eq + Hash,
+    S: BuildHasher,
+{
+    /// An empty map of hashconsed things, using a custom hash.
+    ///
+    /// See [`BuildHasher`] for the trait that `build_hasher` must implement.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use std::collections::hash_map::RandomState;
+    /// use hashconsing::{HConsed, hash_coll::HConMap};
+    ///
+    /// #[derive(Hash,PartialEq,Eq)]
+    /// struct ActualSum(Vec<Sum>);
+    /// type Sum = HConsed<ActualSum>;
+    ///
+    /// // Build map with standard library's hash builder (SipHash)
+    /// let map = HConMap::<Sum, usize, _>::with_hasher(RandomState::new());
+    /// ```
+    #[inline]
+    pub fn with_hasher(build_hasher: S) -> Self {
+        HConMap {
+            map: HashMap::with_hasher(build_hasher),
+        }
+    }
+    /// An empty map of hashconsed things with a capacity and a custom hash.
+    ///
+    /// See [`BuildHasher`] for the trait that `build_hasher` must implement.
+    #[inline]
+    pub fn with_capacity_and_hasher(capa: usize, build_hasher: S) -> Self {
+        HConMap {
+            map: HashMap::with_capacity_and_hasher(capa, build_hasher),
+        }
+    }
+}
+
+impl<T: HashConsed, V, S> HConMap<T, V, S>
+where
+    T::Inner: Hash + Eq,
+{
     /// An iterator visiting all elements.
     #[inline]
     pub fn iter(&self) -> ::std::collections::hash_map::Iter<HConsed<T::Inner>, V> {
@@ -331,7 +460,8 @@ where
         self.map.iter_mut()
     }
 }
-impl<'a, T, V> IntoIterator for &'a HConMap<T, V>
+
+impl<'a, T, V, S> IntoIterator for &'a HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -342,7 +472,7 @@ where
         (&self.map).into_iter()
     }
 }
-impl<'a, T, V> IntoIterator for &'a mut HConMap<T, V>
+impl<'a, T, V, S> IntoIterator for &'a mut HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -353,7 +483,7 @@ where
         (&mut self.map).into_iter()
     }
 }
-impl<T, V> IntoIterator for HConMap<T, V>
+impl<T, V, S> IntoIterator for HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -364,10 +494,11 @@ where
         self.map.into_iter()
     }
 }
-impl<T, V> ::std::iter::FromIterator<(HConsed<T::Inner>, V)> for HConMap<T, V>
+impl<T, V, S> ::std::iter::FromIterator<(HConsed<T::Inner>, V)> for HConMap<T, V, S>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
+    S: Default + BuildHasher,
 {
     fn from_iter<I: IntoIterator<Item = (HConsed<T::Inner>, V)>>(iter: I) -> Self {
         HConMap {
@@ -375,16 +506,16 @@ where
         }
     }
 }
-impl<T: HashConsed, V> Deref for HConMap<T, V>
+impl<T: HashConsed, V, S> Deref for HConMap<T, V, S>
 where
     T::Inner: Hash + Eq,
 {
-    type Target = HashMap<HConsed<T::Inner>, V, BuildHashU64>;
+    type Target = HashMap<HConsed<T::Inner>, V, S>;
     fn deref(&self) -> &Self::Target {
         &self.map
     }
 }
-impl<T: HashConsed, V> DerefMut for HConMap<T, V>
+impl<T: HashConsed, V, S> DerefMut for HConMap<T, V, S>
 where
     T::Inner: Hash + Eq,
 {
@@ -393,13 +524,14 @@ where
     }
 }
 
-impl<T, V, Src> From<Src> for HConMap<HConsed<T>, V>
+impl<T, V, Src, S> From<Src> for HConMap<HConsed<T>, V, S>
 where
     T: Hash + Eq,
     Src: Iterator<Item = (HConsed<T>, V)>,
+    S: BuildHasher + Default,
 {
     fn from(src: Src) -> Self {
-        let mut set = HConMap::new();
+        let mut set = HConMap::default();
         for (elem, value) in src {
             set.insert(elem, value);
         }
@@ -407,10 +539,8 @@ where
     }
 }
 
-/// Optimal trivial hash for `usize`s and `u64`s. The former is used for
-/// wrapped indices, the latter for hashconsed things.
-///
-/// **NEVER USE THIS MODULE DIRECTLY. ONLY THROUGH THE `wrap_usize` MACRO.**
+/// Simple hash for `usize`s and `u64`s---simply multiplies the number by a fixed 64-bit
+/// prime. The former is used for wrapped indices, the latter for hashconsed things.
 ///
 /// This is kind of unsafe, in a way. The hasher will cause logic errors if
 /// asked to hash anything else than what it was supposed to hash.
@@ -435,7 +565,8 @@ mod hash {
         }
     }
 
-    /// Trivial hasher for `usize`. **This hasher is only for hashing `usize`s**.
+    /// Simple hasher for `usize`. Multiplies the number by: `0xDA5DF7A7BD02F2C7u64`, a 64-bit
+    /// prime. **This hasher is only for hashing `usize`s**.
     pub struct HashU64 {
         buf: [u8; 8],
     }
@@ -462,7 +593,9 @@ mod hash {
     }
     impl Hasher for HashU64 {
         fn finish(&self) -> u64 {
-            unsafe { ::std::mem::transmute(self.buf) }
+            let block: u64 = unsafe { ::std::mem::transmute(self.buf) };
+            // Multiply by random 64-bit prime to distribute
+            block.wrapping_mul(0xDA5DF7A7BD02F2C7u64)
         }
         fn write(&mut self, bytes: &[u8]) {
             Self::test_bytes(bytes);

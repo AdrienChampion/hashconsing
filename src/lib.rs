@@ -215,9 +215,9 @@
 
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
-    collections::HashMap,
+    collections::{hash_map::RandomState, HashMap},
     fmt,
-    hash::{Hash, Hasher},
+    hash::{BuildHasher, Hash, Hasher},
     ops::Deref,
     sync::{Arc, RwLock, Weak},
 };
@@ -237,6 +237,8 @@ mod test;
 /// - `$(#[$meta:meta])*` meta stuff, typically comments ;
 /// - `$name:ident` name of the consign ;
 /// - `$capa:expr` initial capacity when creating the consign ;
+/// - `$hash_builder:expr` optional hash builder, an
+///   implementation of [`std::hash::BuildHasher`] ;
 /// - `$typ:typ,` type being hashconsed (the underlying type, not the
 ///     hashconsed one) ;
 #[macro_export]
@@ -254,9 +256,27 @@ macro_rules! consign {
             );
         }
     );
+    (
+        $(#[$meta:meta])*
+        let $name:ident = consign($capa:expr,$hash_builder:expr) for $typ:ty ;
+    ) => (
+        $crate::lazy_static! {
+            $(#[$meta])*
+            static ref $name: ::std::sync::RwLock<
+                $crate::HConsign<$typ>
+            > = ::std::sync::RwLock::new(
+                $crate::HConsign::with_capacity_and_hasher( $capa, $hash_builder )
+            );
+        }
+    );
 }
 
+#[deprecated(
+    since = "1.4.0",
+    note = "Deprecated for poor performance. We recommend the hash_coll module instead."
+)]
 pub mod coll;
+pub mod hash_coll;
 
 /// Internal trait used to recognize hashconsed things.
 ///
@@ -426,14 +446,14 @@ impl<T> Ord for WHConsed<T> {
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HConsign<T: Hash + Eq + Clone> {
+pub struct HConsign<T: Hash + Eq + Clone, S = RandomState> {
     /// The actual hash consing table.
-    table: HashMap<T, WHConsed<T>>,
+    table: HashMap<T, WHConsed<T>, S>,
     /// Counter for uids.
     count: u64,
 }
 
-impl<T: Hash + Eq + Clone> HConsign<T> {
+impl<T: Hash + Eq + Clone> HConsign<T, RandomState> {
     /// Creates an empty consign.
     #[inline]
     pub fn empty() -> Self {
@@ -451,7 +471,9 @@ impl<T: Hash + Eq + Clone> HConsign<T> {
             count: 0,
         }
     }
+}
 
+impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
     /// Fold on the elements stored in the consign.
     #[inline]
     pub fn fold<Acc, F>(&self, mut init: Acc, mut f: F) -> Acc
@@ -496,6 +518,26 @@ impl<T: Hash + Eq + Clone> HConsign<T> {
     pub fn is_empty(&self) -> bool {
         self.table.is_empty()
     }
+}
+
+impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
+    /// Creates an empty consign with a custom hash
+    #[inline]
+    pub fn with_hasher(build_hasher: S) -> Self {
+        HConsign {
+            table: HashMap::with_hasher(build_hasher),
+            count: 0,
+        }
+    }
+
+    /// Creates an empty consign with a capacity.
+    #[inline]
+    pub fn with_capacity_and_hasher(capacity: usize, build_hasher: S) -> Self {
+        HConsign {
+            table: HashMap::with_capacity_and_hasher(capacity, build_hasher),
+            count: 0,
+        }
+    }
 
     /// Inserts in the consign.
     ///
@@ -525,7 +567,7 @@ impl<T: Hash + Eq + Clone> HConsign<T> {
     }
 }
 
-impl<T: Hash + Eq + Clone> fmt::Display for HConsign<T>
+impl<T: Hash + Eq + Clone, S> fmt::Display for HConsign<T, S>
 where
     T: Hash + fmt::Display,
 {
@@ -572,7 +614,7 @@ pub trait HashConsign<T: Hash>: Sized {
     /// Reserves capacity for at least `additional` more elements.
     fn reserve(self, additional: usize);
 }
-impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a mut HConsign<T> {
+impl<'a, T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &'a mut HConsign<T, S> {
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
         // If the element is known and upgradable return it.
         if let Some(hconsed) = self.get(&elm) {
