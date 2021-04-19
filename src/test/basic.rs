@@ -116,7 +116,7 @@ fn run() {
 
 #[test]
 fn run_hash_coll() {
-    use hash_coll::{HConMap, HConSet};
+    use hash_coll::p_hash::{HConMap, HConSet};
 
     let mut consign = HConsign::empty();
     assert_eq!(consign.len(), 0);

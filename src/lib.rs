@@ -172,8 +172,8 @@
 //! #     pub fn app(t_1: Term, t_2: Term) -> Term {
 //! #         factory.mk( ActualTerm::App(t_1, t_2) )
 //! #     }
-//! impl ::std::fmt::Display for ActualTerm {
-//!     fn fmt(& self, fmt: & mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+//! impl std::fmt::Display for ActualTerm {
+//!     fn fmt(& self, fmt: & mut std::fmt::Formatter) -> std::fmt::Result {
 //!         match self {
 //!             ActualTerm::Var(i) => write!(fmt, "v{}", i),
 //!             ActualTerm::Lam(t) => write!(fmt, "({})", t.get()),
@@ -224,8 +224,6 @@ use std::{
 
 pub extern crate lazy_static;
 
-pub use lazy_static::lazy_static;
-
 #[cfg(test)]
 mod test;
 
@@ -247,24 +245,24 @@ macro_rules! consign {
         $(#[$meta:meta])*
         let $name:ident = consign($capa:expr) for $typ:ty ;
     ) => (
-        $crate::lazy_static! {
+        $crate::lazy_static::lazy_static! {
             $(#[$meta])*
-            static ref $name: ::std::sync::RwLock<
+            static ref $name: std::sync::RwLock<
                 $crate::HConsign<$typ>
-            > = ::std::sync::RwLock::new(
+            > = std::sync::RwLock::new(
                 $crate::HConsign::with_capacity( $capa )
             );
         }
     );
     (
         $(#[$meta:meta])*
-        let $name:ident = consign($capa:expr,$hash_builder:expr) for $typ:ty ;
+        let $name:ident = consign($capa:expr, $hash_builder:expr) for $typ:ty ;
     ) => (
-        $crate::lazy_static! {
+        $crate::lazy_static::lazy_static! {
             $(#[$meta])*
-            static ref $name: ::std::sync::RwLock<
+            static ref $name: std::sync::RwLock<
                 $crate::HConsign<$typ>
-            > = ::std::sync::RwLock::new(
+            > = std::sync::RwLock::new(
                 $crate::HConsign::with_capacity_and_hasher( $capa, $hash_builder )
             );
         }
@@ -383,7 +381,7 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
     }
 }
 
-/// Weak version of `HConsed` (internal).
+/// Weak version of `HConsed`.
 pub struct WHConsed<T> {
     /// The actual element.
     elm: Weak<T>,

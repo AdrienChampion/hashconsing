@@ -1,3 +1,14 @@
+v1.5.0
+
+- revamped hash-collections, thanks again @alex-ozdemir!
+
+    Details in [PR 8](https://github.com/AdrienChampion/hashconsing/pull/8).
+
+    - pre-`v1.5.0` default was the identity hasher, now called `id-hash`;
+    - default hasher is now `p-hash` (faster and deterministic);
+    - Rust's std hash (`sip-hash`) also available (non-deterministic);
+    - `a-hash` available by activating feature `"with_ahash"` (fastest, non-deterministic).
+
 v1.3.0
 
 - publicized the weak reference API, thanks @alex-ozdemir!

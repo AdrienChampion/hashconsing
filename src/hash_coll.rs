@@ -1,42 +1,60 @@
 //! Efficient hash collections for hashconsed data.
 //!
-//! This module provide hash set and hash map types with simple hash functions for hashconsed
-//! types. The hash of an hashconsed value is its unique identifier, multiplied by a large prime.
-//! This is obviously extremely dangerous from a security point of view: these collections should
-//! **never** be used for cryptographic purposes.
+//! This module provide hash set and hash map types with simple hash functions for hashconsed types.
+//! The hash of an hashconsed value is its unique identifier, multiplied by a large prime. This is
+//! obviously extremely dangerous from a security point of view: these collections should **never**
+//! be used for cryptographic purposes.
 //!
 //! Note that you can also use `BTreeMap` and `BTreeSet` on hashconsed types since they are totally
 //! ordered.
 //!
+//! # Hashers
+//!
+//! This crate provides various hashers. The main discussion about this crate's hashers is in [PR 8
+//! on github].
+//!
+//! [PR 8 on github]: https://github.com/AdrienChampion/hashconsing/pull/8 (repo's PR 8 on github)
+//!
+//! This module exposes hash-collections `HConSet` and `HConMap`, both parameterized by a hash
+//! implementation. This module provides the following hashers, ordered from least efficient to most
+//! efficient:
+//!
+//! - [`id_hash`](./hashers/id_hash): deterministic, inefficient, mostly here for legacy reasons;
+//! - [`sip_hash`](./hashers/sip_hash): Rust's standard hasher, non-deterministic;
+//! - [`p_hash`](./hashers/p_hash): deterministic and efficient, replaces the obsolete `id_hash`;
+//! - [`a_hash`](./hashers/a_hash): non-deterministic and very efficient hasher, requires the
+//!   activation of feature `with_ahash`.
+//!
+//! The default hasher for `HConSet` and `HConMap` is `p_hash`.
+//!
+//! This module exposes a dedicated sub-module for each of these hashers that re-exports `HConSet`
+//! and `HConMap` while forcing the appropriate hasher.
+//!
+//!
 //! # Usage
 //!
-//! > TL;DR You need to specify the hashconsed type when creating one of the
-//! > collections in this module.
+//! > TL;DR You need to specify the hashconsed type when creating one of the collections in this
+//! > module.
 //!
-//! There is a bit of internal gymnastic so that the type signatures of these
-//! collections are natural. If `Term` is the hashconsed version of `RTerm`,
-//! then you want the type of the sets to be the natural one, *e.g.*
-//! `HConSet<Term>`.
+//! There is a bit of internal gymnastic so that the type signatures of these collections are
+//! natural. If `Term` is the hashconsed version of `RTerm`, then you want the type of the sets to
+//! be the natural one, *e.g.* `HConSet<Term>`.
 //!
-//! However, since `Term` is really an alias for `HConsed<RTerm>`, then if we
-//! wanted to declare `HConSet` as an alias for `HashSet` we would get `type
-//! HConSet<Inner> = HashSet< HConsed<Inner> >` (omitting the custom hasher).
-//! That is, our sets would have type `HConSet<RTerm>`, which is not very
-//! pretty. We could just define an alias though: `type TermSet =
-//! HConSet<RTerm>`, but it turns out it's better to wrap the actual set in a
-//! `struct` anyway. Mostly to be able to define `new` and `with_capacity`
-//! without relying on a trait (users would need to import) to do that.
+//! However, since `Term` is really an alias for `HConsed<RTerm>`, then if we wanted to declare
+//! `HConSet` as an alias for `HashSet` we would get `type HConSet<Inner> = HashSet< HConsed<Inner>
+//! >` (omitting the custom hasher). That is, our sets would have type `HConSet<RTerm>`, which is
+//! not very pretty. We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it
+//! turns out it's better to wrap the actual set in a `struct` anyway. Mostly to be able to define
+//! `new` and `with_capacity` without relying on a trait (users would need to import) to do that.
 //!
-//! So actually `HConsed` types automatically implement the internal `trait
-//! HashConsed { type Inner ; }`. The sole purpose of this trait (currently) is
-//! to pass the inner type implicitly thanks to a `T: HashConsed` bound. Rust's
-//! type inference does not seem to really like this, and struggles a bit to
-//! infer the types at play. In practice, it means that you need to specify the
-//! type of the hashconsed elements in your set/map.
+//! So actually `HConsed` types automatically implement the internal `trait HashConsed { type Inner;
+//! }`. The sole purpose of this trait (currently) is to pass the inner type implicitly thanks to a
+//! `T: HashConsed` bound. Rust's type inference does not seem to really like this, and struggles a
+//! bit to infer the types at play. In practice, it means that you need to specify the type of the
+//! hashconsed elements in your set/map.
 //!
 //! ```
-//! use hashconsing::* ;
-//! use hashconsing::hash_coll::* ;
+//! use hashconsing::{*, hash_coll::default::*};
 //!
 //! #[derive(Hash, Clone, PartialEq, Eq)]
 //! enum ActualTerm {
@@ -44,30 +62,29 @@
 //!   Lam(Term),
 //!   App(Term, Term)
 //! }
-//! type Term = HConsed<ActualTerm> ;
+//! type Term = HConsed<ActualTerm>;
 //!
-//! let mut consign = HConsign::empty() ;
-//! assert_eq!(consign.len(), 0) ;
+//! let mut consign = HConsign::empty();
+//! assert_eq!(consign.len(), 0);
 //!
-//! let mut map: HConMap<Term,_> = HConMap::with_capacity(100) ;
-//! let mut set: HConSet<Term> = HConSet::with_capacity(100) ;
+//! let mut map: HConMap<Term,_> = HConMap::with_capacity(100);
+//! let mut set: HConSet<Term> = HConSet::with_capacity(100);
 //!
 //! let (v1, v1_name) = (
 //!   consign.mk( ActualTerm::Var(0) ), "v1"
-//! ) ;
-//! assert_eq!(consign.len(), 1) ;
-//! let prev = map.insert(v1.clone(), v1_name) ;
-//! assert_eq!( prev, None ) ;
-//! let is_new = set.insert(v1.clone()) ;
-//! assert!( is_new ) ;
+//! );
+//! assert_eq!(consign.len(), 1);
+//! let prev = map.insert(v1.clone(), v1_name);
+//! assert_eq!( prev, None );
+//! let is_new = set.insert(v1.clone());
+//! assert!( is_new );
 //! ```
 //!
-//! The problem completely goes away if you redefine your set/map type, and is
-//! the recommended way of using these collections.
+//! The problem completely goes away if you redefine your set/map type, and is the recommended way
+//! of using these collections.
 //!
 //! ```
-//! use hashconsing::* ;
-//! use hashconsing::hash_coll::* ;
+//! use hashconsing::{*, hash_coll::*};
 //!
 //! #[derive(Hash, Clone, PartialEq, Eq)]
 //! enum ActualTerm {
@@ -75,32 +92,31 @@
 //!   Lam(Term),
 //!   App(Term, Term)
 //! }
-//! type Term = HConsed<ActualTerm> ;
-//! type TermMap<T> = HConMap<Term, T> ;
-//! type TermSet = HConSet<Term> ;
+//! type Term = HConsed<ActualTerm>;
+//! type TermMap<T> = HConMap<Term, T>;
+//! type TermSet = HConSet<Term>;
 //!
-//! let mut consign = HConsign::empty() ;
-//! assert_eq!(consign.len(), 0) ;
+//! let mut consign = HConsign::empty();
+//! assert_eq!(consign.len(), 0);
 //!
-//! let mut map = TermMap::with_capacity(100) ;
-//! let mut set = TermSet::with_capacity(100) ;
+//! let mut map = TermMap::with_capacity(100);
+//! let mut set = TermSet::with_capacity(100);
 //!
 //! let (v1, v1_name) = (
 //!   consign.mk( ActualTerm::Var(0) ), "v1"
-//! ) ;
-//! assert_eq!(consign.len(), 1) ;
-//! let prev = map.insert(v1.clone(), v1_name) ;
-//! assert_eq!( prev, None ) ;
-//! let is_new = set.insert(v1.clone()) ;
-//! assert!( is_new ) ;
+//! );
+//! assert_eq!(consign.len(), 1);
+//! let prev = map.insert(v1.clone(), v1_name);
+//! assert_eq!( prev, None );
+//! let is_new = set.insert(v1.clone());
+//! assert!( is_new );
 //! ```
 //!
 //! One can modify the hash use by term maps and sets, as well as the term map underlying a
 //! consignment.
 //!
 //! ```
-//! use hashconsing::*;
-//! use hashconsing::hash_coll::*;
+//! use hashconsing::{*, hash_coll::*};
 //! use std::collections::hash_map::RandomState;
 //!
 //! #[derive(Hash,PartialEq,Eq,Clone)]
@@ -109,7 +125,7 @@
 //!
 //! consign! {
 //!     /// Factory for terms. Uses the standard library's "SipHash".
-//!     let factory = consign(37, RandomState::new()) for ActualSum ;
+//!     let factory = consign(37, RandomState::new()) for ActualSum;
 //! }
 //!
 //! fn main() {
@@ -117,11 +133,59 @@
 //!     let map = HConMap::<Sum, usize, RandomState>::with_hasher(RandomState::new());
 //! }
 //! ```
-use std::collections::{HashMap, HashSet};
-use std::hash::{BuildHasher, Hash, Hasher};
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::{HashMap, HashSet},
+    hash::{BuildHasher, Hash, Hasher},
+    ops::{Deref, DerefMut},
+};
 
-use self::hash::BuildHashU64;
+pub mod hashers;
+
+/// Hash sets (maps) for (from) hconsed elements using [`ahash`].
+///
+/// > **NB:** this module is empty if the `"with_ahash"` feature is not active.
+///
+/// [ahash]: https://crates.io/crates/ahash (ahash on crates.io)
+pub mod a_hash {
+    /// Set of hashconsed elements.
+    #[cfg(feature = "with_ahash")]
+    pub type HConSet<T> = super::HConSet<T, super::hashers::a_hash::Builder>;
+    /// Map from hashconsed elements.
+    #[cfg(feature = "with_ahash")]
+    pub type HConMap<K, V> = super::HConMap<K, V, super::hashers::a_hash::Builder>;
+}
+/// Hash sets (maps) for (from) hconsed elements using Rust's `std` hasher.
+pub mod sip_hash {
+    /// Set of hashconsed elements.
+    pub type HConSet<T> = super::HConSet<T, super::hashers::sip_hash::Builder>;
+    /// Map from hashconsed elements.
+    pub type HConMap<K, V> = super::HConMap<K, V, super::hashers::sip_hash::Builder>;
+}
+/// Hash sets (maps) for (from) hconsed elements using [`p-hash`].
+///
+/// [`p-hash`]: https://github.com/AdrienChampion/hashconsing/pull/8 (p-hash in PR 8 on github)
+pub mod p_hash {
+    /// Set of hashconsed elements.
+    pub type HConSet<T> = super::HConSet<T, super::hashers::p_hash::Builder>;
+    /// Map from hashconsed elements.
+    pub type HConMap<K, V> = super::HConMap<K, V, super::hashers::p_hash::Builder>;
+}
+/// Hash sets (maps) for (from) hconsed elements using [`id-hash`].
+///
+/// [`id-hash`]: https://github.com/AdrienChampion/hashconsing/pull/8 (p-hash in PR 8 on github)
+pub mod id_hash {
+    /// Set of hashconsed elements.
+    pub type HConSet<T> = super::HConSet<T, super::hashers::id_hash::Builder>;
+    /// Map from hashconsed elements.
+    pub type HConMap<K, V> = super::HConMap<K, V, super::hashers::id_hash::Builder>;
+}
+/// Default hash sets (maps) for (from) hconsed elements.
+///
+/// Just a re-export of [`p_hash`](../p_hash/).
+pub mod default {
+    pub use super::p_hash::*;
+}
+
 use crate::{HConsed, HashConsed};
 
 /// A hash set of hash-consed things.
@@ -130,7 +194,7 @@ use crate::{HConsed, HashConsed};
 /// for this set. The default is an in-crate hash function which just multiplies the identifier of
 /// the hash-consed type by a large prime.
 #[derive(Clone, Debug)]
-pub struct HConSet<T, S = BuildHashU64>
+pub struct HConSet<T, S = self::hashers::p_hash::Builder>
 where
     T: HashConsed,
     T::Inner: Eq + Hash,
@@ -186,25 +250,41 @@ where
     }
 }
 
-impl<T> HConSet<T, BuildHashU64>
-where
-    T: HashConsed,
-    T::Inner: Eq + Hash,
-{
-    /// An empty set of hashconsed things.
-    #[inline]
-    pub fn new() -> Self {
-        HConSet {
-            set: HashSet::with_hasher(BuildHashU64 {}),
+macro_rules! hashplement {
+    {$(
+        $(#[$meta:meta])*
+        $hcoll_name:ident <
+            $key_t_param:ident
+            $(, $val_t_param:ident)?
+        > for $hasher:ty ;
+    )*} => {$(
+        $(#[$meta])*
+        impl<$key_t_param $(, $val_t_param)?> $hcoll_name<
+            $key_t_param $(, $val_t_param)?, $hasher
+        >
+        where
+            $key_t_param: HashConsed,
+            $key_t_param::Inner: Eq + Hash,
+        {
+            /// Empty constructor.
+            #[inline]
+            pub fn new() -> Self {
+                $hcoll_name::with_hasher(<$hasher>::new())
+            }
+            /// Empty constructor with capacity.
+            pub fn with_capacity(capa: usize) -> Self {
+                $hcoll_name::with_capacity_and_hasher(capa, <$hasher>::new())
+            }
         }
-    }
-    /// An empty set of hashconsed things with a capacity.
-    #[inline]
-    pub fn with_capacity(capa: usize) -> Self {
-        HConSet {
-            set: HashSet::with_capacity_and_hasher(capa, BuildHashU64 {}),
-        }
-    }
+    )*};
+}
+
+hashplement! {
+    #[cfg(feature = "with_ahash")]
+    HConSet<T> for self::hashers::a_hash::Builder;
+    HConSet<T> for self::hashers::sip_hash::Builder;
+    HConSet<T> for self::hashers::p_hash::Builder;
+    HConSet<T> for self::hashers::id_hash::Builder;
 }
 
 impl<T, S> HConSet<T, S>
@@ -321,7 +401,7 @@ where
 /// for this set. The default is an in-crate hash function which just multiplies the identifier of
 /// the hash-consed type by a large prime.
 #[derive(Clone, Debug)]
-pub struct HConMap<T, V, S = BuildHashU64>
+pub struct HConMap<T, V, S = self::hashers::p_hash::Builder>
 where
     T: HashConsed,
     T::Inner: Hash + Eq,
@@ -385,24 +465,12 @@ where
     }
 }
 
-impl<T: HashConsed, V> HConMap<T, V, BuildHashU64>
-where
-    T::Inner: Hash + Eq,
-{
-    /// An empty map of hashconsed things.
-    #[inline]
-    pub fn new() -> Self {
-        HConMap {
-            map: HashMap::with_hasher(BuildHashU64 {}),
-        }
-    }
-    /// An empty map of hashconsed things with a capacity.
-    #[inline]
-    pub fn with_capacity(capa: usize) -> Self {
-        HConMap {
-            map: HashMap::with_capacity_and_hasher(capa, BuildHashU64 {}),
-        }
-    }
+hashplement! {
+    #[cfg(feature = "with_ahash")]
+    HConMap<K, V> for self::hashers::a_hash::Builder;
+    HConMap<K, V> for self::hashers::sip_hash::Builder;
+    HConMap<K, V> for self::hashers::p_hash::Builder;
+    HConMap<K, V> for self::hashers::id_hash::Builder;
 }
 
 impl<T, V, S> HConMap<T, V, S>
@@ -553,6 +621,12 @@ mod hash {
     /// Empty struct used to build `HashU64`.
     #[derive(Clone)]
     pub struct BuildHashU64 {}
+    impl BuildHashU64 {
+        #[allow(dead_code)]
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
     impl BuildHasher for BuildHashU64 {
         type Hasher = HashU64;
         fn build_hasher(&self) -> HashU64 {
