@@ -8,7 +8,7 @@
 ///
 /// > **NB:** this module is empty if the `with_ahash` feature is not active.
 ///
-/// [ahash]: https://crates.io/crates/ahash (ahash on crates.io)
+/// [`ahash`]: https://crates.io/crates/ahash (ahash on crates.io)
 #[cfg(feature = "with_ahash")]
 pub mod a_hash {
     pub use ahash::{AHasher as Hasher, RandomState as Builder};

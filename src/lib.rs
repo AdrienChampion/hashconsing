@@ -213,6 +213,8 @@
 //! [lazy static]: https://crates.io/crates/lazy_static
 //! (lazy_static library on crates.io)
 
+#![deny(warnings)]
+
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     collections::{hash_map::RandomState, HashMap},

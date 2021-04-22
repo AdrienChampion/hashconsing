@@ -145,7 +145,7 @@ pub mod hashers;
 ///
 /// > **NB:** this module is empty if the `"with_ahash"` feature is not active.
 ///
-/// [ahash]: https://crates.io/crates/ahash (ahash on crates.io)
+/// [`ahash`]: https://crates.io/crates/ahash (ahash on crates.io)
 pub mod a_hash {
     /// Set of hashconsed elements.
     #[cfg(feature = "with_ahash")]
