@@ -95,6 +95,15 @@
 //! let is_new = set.insert(v1.clone()) ;
 //! assert!( is_new ) ;
 //! ```
+//!
+//! # Hashing Concerns
+//!
+//! This module uses the unique hash-consing identifier as the hash for elements stored in
+//! collections. These identifier are monotonically increasing (and are thus not well-distributed)
+//! causing degraded performance in the Rust standard library's hash table. You can see [this
+//! PR][pr] for more details. We recommend the collections in the [hash_coll](crate::hash_coll) module instead.
+//!
+//! [pr]: https://github.com/AdrienChampion/hashconsing/pull/8
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
