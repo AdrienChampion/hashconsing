@@ -24,7 +24,7 @@ pub mod p_hash {
     use std::hash::{BuildHasher as StdBuilderExt, Hasher as StdHasherExt};
 
     /// P-hash-er factory.
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct Builder {}
     impl Builder {
         /// Empty factory constructor.
@@ -91,7 +91,7 @@ pub mod id_hash {
     use std::hash::{BuildHasher as StdBuilderExt, Hasher as StdHasherExt};
 
     /// P-hash-er factory.
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct Builder {}
     impl Builder {
         /// Empty factory constructor.

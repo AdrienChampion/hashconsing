@@ -7,18 +7,23 @@ warning: unused import: `HConsed`
   = note: `#[warn(unused_imports)]` on by default
 
 error[E0277]: `Cell<RefOrInt<'_>>` cannot be shared between threads safely
-  --> $DIR/issue_1.rs:37:11
-   |
-37 |         s.spawn(move |_| {
-   |           ^^^^^ `Cell<RefOrInt<'_>>` cannot be shared between threads safely
-   |
-   = help: within `&HashableCell<RefOrInt<'_>>`, the trait `Sync` is not implemented for `Cell<RefOrInt<'_>>`
+   --> $DIR/issue_1.rs:37:11
+    |
+37  |         s.spawn(move |_| {
+    |           ^^^^^ `Cell<RefOrInt<'_>>` cannot be shared between threads safely
+    |
+    = help: within `&HashableCell<RefOrInt<'_>>`, the trait `Sync` is not implemented for `Cell<RefOrInt<'_>>`
 note: required because it appears within the type `HashableCell<RefOrInt<'_>>`
-  --> $DIR/issue_1.rs:18:8
-   |
-18 | struct HashableCell<T: Eq + PartialEq + Copy> {
-   |        ^^^^^^^^^^^^
-   = note: required because it appears within the type `&HashableCell<RefOrInt<'_>>`
-   = note: required because of the requirements on the impl of `Send` for `Arc<&HashableCell<RefOrInt<'_>>>`
-   = note: required because it appears within the type `HConsed<&HashableCell<RefOrInt<'_>>>`
-   = note: required because it appears within the type `[closure@$DIR/tests/try_build/issue_1.rs:37:17: 45:10]`
+   --> $DIR/issue_1.rs:18:8
+    |
+18  | struct HashableCell<T: Eq + PartialEq + Copy> {
+    |        ^^^^^^^^^^^^
+    = note: required because it appears within the type `&HashableCell<RefOrInt<'_>>`
+    = note: required because of the requirements on the impl of `Send` for `Arc<&HashableCell<RefOrInt<'_>>>`
+    = note: required because it appears within the type `HConsed<&HashableCell<RefOrInt<'_>>>`
+    = note: required because it appears within the type `[closure@$DIR/tests/try_build/issue_1.rs:37:17: 45:10]`
+note: required by a bound in `crossbeam_utils::thread::Scope::<'env>::spawn`
+   --> $DIR/thread.rs:248:12
+    |
+248 |         F: Send + 'env,
+    |            ^^^^ required by this bound in `crossbeam_utils::thread::Scope::<'env>::spawn`

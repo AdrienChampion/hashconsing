@@ -1,3 +1,8 @@
+v1.5.1
+
+- adds `Debug` to hash factories
+- hopefully fixed the doc.rs issue, docgen was failing
+
 v1.5.0
 
 - revamped hash-collections, thanks again @alex-ozdemir!
