@@ -394,9 +394,9 @@ impl<T> WHConsed<T> {
     /// Turns a weak hashconsed thing in a hashconsed thing.
     pub fn to_hconsed(&self) -> Option<HConsed<T>> {
         self.elm.upgrade().map(|arc| HConsed {
-                elm: arc,
-                uid: self.uid,
-            })
+            elm: arc,
+            uid: self.uid,
+        })
     }
 }
 
