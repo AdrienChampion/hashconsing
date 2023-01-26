@@ -10,7 +10,7 @@ readme = "README.md"
 categories = ["caching", "compression", "concurrency", "data-structures", "memory-management", ]
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [package.metadata.docs.rs]
 features = ["unstable_docrs"]
