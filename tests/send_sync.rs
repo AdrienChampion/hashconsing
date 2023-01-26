@@ -42,7 +42,7 @@ fn rayon() {
         .par_iter()
         .map(|tree| {
             if verbose {
-                println!("{:?}", tree)
+                println!("{tree:?}")
             }
         })
         .collect::<()>();
@@ -51,7 +51,7 @@ fn rayon() {
         .into_par_iter()
         .map(|tree| {
             if verbose {
-                println!("{:?}", tree)
+                println!("{tree:?}")
             }
         })
         .collect::<()>();
