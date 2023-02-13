@@ -1,10 +1,11 @@
 use darling::FromMeta;
 use proc_macro::{self, TokenStream};
-use proc_macro2::{Ident, Span};
+use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, punctuated::Punctuated, AttributeArgs, Data, DataEnum, DeriveInput, FnArg,
-    Pat, PatIdent, PatType, Token,
+    parse_macro_input, punctuated::Punctuated, token::Paren, AttributeArgs, Data, DataEnum,
+    DeriveInput, Expr, ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments,
+    PathSegment, Token,
 };
 
 #[derive(Debug, Default, FromMeta)]
@@ -22,7 +23,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
         ident,
         vis,
         attrs,
-        generics,
+        generics: _,
         data,
     } = parse_macro_input!(parsed_input);
 
@@ -36,7 +37,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     let struct_name = format_ident!("{}", args.name);
     let factory_name = format_ident!("{}_FACTORY", args.name);
 
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    /*     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl(); */
 
     let hash_struct = quote! {
         #(#attrs)*
@@ -55,53 +56,91 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
             let variant_names = variants.iter().map(|v| &v.ident);
             let (variant_field_function_args, variant_field_calling_args): (
                 Vec<Punctuated<FnArg, Token![,]>>,
-                Vec<Punctuated<Ident, Token![,]>>,
+                Vec<Expr>,
             ) = variants
                 .iter()
                 .map(|v| {
-                    let (arg_names, arg_types): (Vec<_>, Vec<_>) = v
+                    let (arg_names, arg_types): (Vec<Expr>, Vec<FnArg>) = v
                         .fields
                         .iter()
                         .enumerate()
-                        .map(|(i, f)| (format_ident!("args{}", i), &f.ty))
-                        .unzip();
-
-                    let calling_args = Punctuated::from_iter(arg_names.clone());
-
-                    let function_args = arg_names
-                        .into_iter()
-                        .zip(arg_types.into_iter())
-                        .map(
-                            |(n, t)| {
+                        .map(|(i, f)| {
+                            let id = format_ident!("args{}", i);
+                            (
+                                {
+                                    ExprPath {
+                                        attrs: Vec::new(),
+                                        qself: None,
+                                        path: Path {
+                                            leading_colon: None,
+                                            segments: Punctuated::from_iter(vec![PathSegment {
+                                                ident: id.clone(),
+                                                arguments: PathArguments::None,
+                                            }]),
+                                        },
+                                    }
+                                    .into()
+                                },
                                 FnArg::Typed(PatType {
                                     attrs: Vec::new(),
                                     pat: Box::new(Pat::Ident(PatIdent {
                                         attrs: Vec::new(),
                                         by_ref: None,
                                         mutability: None,
-                                        ident: n,
+                                        ident: id,
                                         subpat: None,
                                     })),
                                     colon_token: Token![:](Span::call_site()),
-                                    ty: Box::new(t.clone()),
-                                })
-                            }, /* format!("{} : {}", n, t.into_token_stream()) */
-                        )
-                        .collect::<Vec<_>>();
+                                    ty: Box::new(f.ty.clone()),
+                                }),
+                            )
+                        })
+                        .unzip();
 
-                    (Punctuated::from_iter(function_args), calling_args)
+                    let calling_args = Punctuated::from_iter(arg_names);
+
+                    let variant_name = Expr::Path(ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: Path {
+                            leading_colon: None,
+                            segments: Punctuated::from_iter(vec![
+                                PathSegment {
+                                    ident: ident.clone(),
+                                    arguments: PathArguments::None,
+                                },
+                                PathSegment {
+                                    ident: v.ident.clone(),
+                                    arguments: PathArguments::None,
+                                },
+                            ]),
+                        },
+                    });
+
+                    let variant_expr = if calling_args.is_empty() {
+                        variant_name
+                    } else {
+                        ExprCall {
+                            attrs: Vec::new(),
+                            func: Box::new(variant_name),
+                            paren_token: Paren(Span::call_site()),
+                            args: calling_args,
+                        }
+                        .into()
+                    };
+
+                    (Punctuated::from_iter(arg_types), variant_expr)
                 })
                 .unzip();
 
             quote! {
                 consign! {
-                    /// Factory for terms.
                     let #factory_name = consign(50) for #ident ;
                 }
 
                 impl #struct_name {
                     #(pub fn #variant_names(#variant_field_function_args) -> Self {
-                        Self(#factory_name.mk(#ident :: #variant_names(#variant_field_calling_args)))
+                        Self(#factory_name.mk(#variant_field_calling_args))
                     })*
                 }
             }
