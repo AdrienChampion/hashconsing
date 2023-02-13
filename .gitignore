@@ -5,7 +5,7 @@
 Cargo.lock
 
 # Ignore target directory.
-/target
+**/target
 
 # Ignore crappy mac files.
 # Ignore files ending in ".nogit".
