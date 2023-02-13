@@ -226,6 +226,14 @@ use std::{
 
 pub extern crate lazy_static;
 
+#[cfg(feature = "derive")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate hashconsing_derive;
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use hashconsing_derive::*;
+
 #[cfg(test)]
 mod test;
 

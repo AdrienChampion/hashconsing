@@ -24,9 +24,11 @@ features = ["unstable_docrs"]
 [features]
 with_ahash = ["ahash"]
 unstable_docrs = ["with_ahash"]
+derive = ["hashconsing-derive"]
 
 [dependencies]
 lazy_static = "1.*"
+hashconsing-derive = { version = "0.1.0", optional = true, path = "hashconsing-derive" }
 
 [dependencies.ahash]
 version = "^0.8.3"
