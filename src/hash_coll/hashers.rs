@@ -24,7 +24,7 @@ pub mod p_hash {
     use std::hash::{BuildHasher as StdBuilderExt, Hasher as StdHasherExt};
 
     /// P-hash-er factory.
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct Builder {}
     impl Builder {
         /// Empty factory constructor.
@@ -36,11 +36,6 @@ pub mod p_hash {
         type Hasher = Hasher;
         fn build_hasher(&self) -> Hasher {
             Hasher { buf: [0; 8] }
-        }
-    }
-    impl Default for Builder {
-        fn default() -> Self {
-            Builder {}
         }
     }
 
@@ -91,7 +86,7 @@ pub mod id_hash {
     use std::hash::{BuildHasher as StdBuilderExt, Hasher as StdHasherExt};
 
     /// P-hash-er factory.
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct Builder {}
     impl Builder {
         /// Empty factory constructor.
@@ -103,11 +98,6 @@ pub mod id_hash {
         type Hasher = Hasher;
         fn build_hasher(&self) -> Hasher {
             Hasher { buf: [0; 8] }
-        }
-    }
-    impl Default for Builder {
-        fn default() -> Self {
-            Builder {}
         }
     }
 

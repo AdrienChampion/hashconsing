@@ -46,15 +46,13 @@ pub fn create_1() -> Term {
     let var = term::var("v_2");
     let cst = term::cst(8);
     let app_1 = term::app("+", vec![var, cst]);
-    let app_2 = term::app("-", vec![app_1]);
-    app_2
+    term::app("-", vec![app_1])
 }
 pub fn create_2() -> Term {
     let var = term::var("v_1");
     let cst = term::cst(7);
     let app_1 = term::app("+", vec![var, cst]);
-    let app_2 = term::app("-", vec![app_1]);
-    app_2
+    term::app("-", vec![app_1])
 }
 
 pub fn factory_len() -> usize {

@@ -1,3 +1,4 @@
+#![allow(clippy::needless_doctest_main)]
 //! Efficient hash collections for hashconsed data.
 //!
 //! This module provide hash set and hash map types with simple hash functions for hashconsed types.
@@ -334,7 +335,7 @@ where
     type Item = &'a HConsed<T::Inner>;
     type IntoIter = ::std::collections::hash_set::Iter<'a, HConsed<T::Inner>>;
     fn into_iter(self) -> Self::IntoIter {
-        (&self.set).into_iter()
+        self.set.iter()
     }
 }
 impl<T, S> IntoIterator for HConSet<T, S>
@@ -537,7 +538,7 @@ where
     type Item = (&'a HConsed<T::Inner>, &'a V);
     type IntoIter = ::std::collections::hash_map::Iter<'a, HConsed<T::Inner>, V>;
     fn into_iter(self) -> Self::IntoIter {
-        (&self.map).into_iter()
+        self.map.iter()
     }
 }
 impl<'a, T, V, S> IntoIterator for &'a mut HConMap<T, V, S>
@@ -548,7 +549,7 @@ where
     type Item = (&'a HConsed<T::Inner>, &'a mut V);
     type IntoIter = ::std::collections::hash_map::IterMut<'a, HConsed<T::Inner>, V>;
     fn into_iter(self) -> Self::IntoIter {
-        (&mut self.map).into_iter()
+        self.map.iter_mut()
     }
 }
 impl<T, V, S> IntoIterator for HConMap<T, V, S>
@@ -619,7 +620,7 @@ mod hash {
     use std::hash::{BuildHasher, Hasher};
 
     /// Empty struct used to build `HashU64`.
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     pub struct BuildHashU64 {}
     impl BuildHashU64 {
         #[allow(dead_code)]
@@ -631,11 +632,6 @@ mod hash {
         type Hasher = HashU64;
         fn build_hasher(&self) -> HashU64 {
             HashU64 { buf: [0; 8] }
-        }
-    }
-    impl Default for BuildHashU64 {
-        fn default() -> Self {
-            BuildHashU64 {}
         }
     }
 

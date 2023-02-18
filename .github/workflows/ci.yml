@@ -25,5 +25,9 @@ jobs:
       run: cargo test --verbose
     - name: Build doc
       run: cargo doc --verbose
+    - name: Run clippy
+      run: cargo clippy --verbose
+    - name: Run rustfmt
+      run: cargo fmt --verbose --check
     - name: Build release
       run: cargo build --release --verbose
