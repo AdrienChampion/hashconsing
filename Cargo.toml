@@ -1,41 +1,5 @@
-[package]
-name = "hashconsing"
-version = "1.6.0"
-authors = ["Adrien Champion <adrien.champion@email.com>"]
-description = "A hash consing library."
-documentation = "https://docs.rs/hashconsing"
-homepage = "https://github.com/AdrienChampion/hashconsing"
-repository = "https://github.com/AdrienChampion/hashconsing"
-readme = "README.md"
-categories = [
-    "caching",
-    "compression",
-    "concurrency",
-    "data-structures",
-    "memory-management",
+[workspace]
+members = [
+    "hashconsing",
+    "hashconsing_derive",
 ]
-keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
-license = "MIT/Apache-2.0"
-edition = "2021"
-
-[package.metadata.docs.rs]
-features = ["unstable_docrs"]
-
-[features]
-with_ahash = ["ahash"]
-unstable_docrs = ["with_ahash"]
-derive = ["hashconsing-derive"]
-
-[dependencies]
-lazy_static = "1.*"
-hashconsing-derive = { version = "0.1.0", optional = true, path = "hashconsing-derive" }
-
-[dependencies.ahash]
-version = "^0.8.3"
-optional = true
-
-[dev-dependencies]
-crossbeam-utils = "^0.8"
-trybuild = "^1.0"
-rayon = "^1.5"
-rand = "0.8"
