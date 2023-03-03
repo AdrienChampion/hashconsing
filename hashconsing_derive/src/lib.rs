@@ -1,6 +1,7 @@
 use darling::FromMeta;
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
+use proc_macro_error::{abort_call_site, proc_macro_error};
 use quote::{format_ident, quote};
 use syn::{
     parse_macro_input, punctuated::Punctuated, token::Paren, AttributeArgs, Data, DataEnum,
@@ -15,6 +16,7 @@ struct MacroArgs {
     impls: bool,
 }
 
+#[proc_macro_error]
 #[proc_macro_attribute]
 pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     let parsed_input = input.clone();
@@ -145,7 +147,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
                 }
             }
         }
-        _ => todo!("Doesn't yet support things that aren't enums for impl"),
+        _ => abort_call_site!("unsupported syntax: hashconsing expected an enum definition"),
     };
 
     let output = if args.impls {
@@ -160,7 +162,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
         }
     };
 
-    println!("{output}");
+    /*     println!("{output}"); */
 
     input.extend::<TokenStream>(output.into());
 
