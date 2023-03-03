@@ -1,4 +1,4 @@
-use darling::FromMeta;
+use darling::{util::Flag, FromMeta, Result};
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
 use proc_macro_error::{abort_call_site, proc_macro_error};
@@ -10,10 +10,20 @@ use syn::{
 };
 
 #[derive(Debug, Default, FromMeta)]
+#[darling(and_then = "Self::not_constructors_without_factory")]
 struct MacroArgs {
     name: String,
-    #[darling(default)]
-    impls: bool,
+    no_factory: Flag,
+    no_constructors: Flag,
+}
+
+impl MacroArgs {
+    fn not_constructors_without_factory(self) -> Result<Self> {
+        if self.no_factory.is_present() && !self.no_constructors.is_present() {
+            abort_call_site!("unsupported flag usage: Can't implement constructors without a static factory")
+        };
+        Ok(self)
+    }
 }
 
 #[proc_macro_error]
@@ -50,6 +60,12 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
+        }
+    };
+
+    let hash_factory = quote! {
+        consign! {
+            let #factory_name = consign(50) for #ident ;
         }
     };
 
@@ -136,10 +152,6 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
                 .unzip();
 
             quote! {
-                consign! {
-                    let #factory_name = consign(50) for #ident ;
-                }
-
                 impl #struct_name {
                     #(pub fn #variant_names(#variant_field_function_args) -> Self {
                         Self(#factory_name.mk(#variant_field_calling_args))
@@ -150,15 +162,23 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
         _ => abort_call_site!("unsupported syntax: hashconsing expected an enum definition"),
     };
 
-    let output = if args.impls {
+    let output = if args.no_constructors.is_present() && args.no_factory.is_present() {
+        quote! {
+            #hash_struct
+        }
+    } else if args.no_constructors.is_present() {
         quote! {
             #hash_struct
 
-            #hash_impl
+            #hash_factory
         }
     } else {
         quote! {
             #hash_struct
+
+            #hash_factory
+
+            #hash_impl
         }
     };
 
