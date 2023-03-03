@@ -20,7 +20,9 @@ struct MacroArgs {
 impl MacroArgs {
     fn not_constructors_without_factory(self) -> Result<Self> {
         if self.no_factory.is_present() && !self.no_constructors.is_present() {
-            abort_call_site!("unsupported flag usage: Can't implement constructors without a static factory")
+            abort_call_site!(
+                "unsupported flag usage: Can't implement constructors without a static factory"
+            )
         };
         Ok(self)
     }
