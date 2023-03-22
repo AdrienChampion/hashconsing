@@ -35,7 +35,7 @@ version = "^0.8.3"
 optional = true
 
 [dev-dependencies]
-crossbeam-utils = "^0.8"
+crossbeam-utils = "=0.8.15"
 trybuild = "^1.0"
 rayon = "^1.5"
 rand = "0.8"
