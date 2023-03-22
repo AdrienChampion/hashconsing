@@ -55,8 +55,10 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
 
     let hash_struct = quote! {
         #(#attrs)*
+        #[automatically_derived]
         #vis struct #struct_name(HConsed<#ident>);
 
+        #[automatically_derived]
         impl std::ops::Deref for #struct_name {
             type Target = HConsed<#ident>;
             fn deref(&self) -> &Self::Target {
@@ -154,6 +156,8 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
                 .unzip();
 
             quote! {
+                #[automatically_derived]
+                #[allow(non_snake_case)]
                 impl #struct_name {
                     #(pub fn #variant_names(#variant_field_function_args) -> Self {
                         Self(#factory_name.mk(#variant_field_calling_args))
