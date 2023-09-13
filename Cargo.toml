@@ -3,3 +3,5 @@ members = [
     "hashconsing",
     "hashconsing_derive",
 ]
+
+resolver = "2"
