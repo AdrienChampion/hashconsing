@@ -318,6 +318,11 @@ impl<T> HConsed<T> {
         }
     }
 
+    /// Weak reference version.
+    pub fn to_weak_ref(&self) -> Weak<T> {
+        Arc::downgrade(&self.elm)
+    }
+
     /// Number of (strong) references to this term.
     pub fn arc_count(&self) -> usize {
         Arc::strong_count(&self.elm)
@@ -397,6 +402,11 @@ impl<T> WHConsed<T> {
             elm: arc,
             uid: self.uid,
         })
+    }
+
+    /// A reference to the underlying weak reference.
+    pub fn as_weak_ref(&self) -> &Weak<T> {
+        &self.elm
     }
 }
 
