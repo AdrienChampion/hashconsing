@@ -7,7 +7,13 @@ documentation = "https://docs.rs/hashconsing"
 homepage = "https://github.com/AdrienChampion/hashconsing"
 repository = "https://github.com/AdrienChampion/hashconsing"
 readme = "README.md"
-categories = ["caching", "compression", "concurrency", "data-structures", "memory-management", ]
+categories = [
+    "caching",
+    "compression",
+    "concurrency",
+    "data-structures",
+    "memory-management",
+]
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
 edition = "2021"
@@ -23,7 +29,7 @@ unstable_docrs = ["with_ahash"]
 lazy_static = "1.*"
 
 [dependencies.ahash]
-version = "^0.7.2"
+version = "^0.8.3"
 optional = true
 
 [dev-dependencies]
