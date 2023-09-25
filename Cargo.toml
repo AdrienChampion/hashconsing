@@ -37,3 +37,8 @@ crossbeam-utils = "^0.8"
 trybuild = "^1.0"
 rayon = "^1.5"
 rand = "0.8"
+
+criterion = "0.5.1"
+[[bench]]
+name = "throughput"
+harness = false
