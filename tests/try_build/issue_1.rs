@@ -2,7 +2,7 @@
 
 #![forbid(unsafe_code)]
 
-use hashconsing::{HConsed, HConsign, HashConsign};
+use hashconsing::{HConsign, HashConsign};
 
 use crossbeam_utils::thread;
 use std::cell::Cell;
