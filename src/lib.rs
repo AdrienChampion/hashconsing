@@ -221,11 +221,13 @@ use std::{
     fmt,
     hash::{BuildHasher, Hash, Hasher},
     ops::Deref,
-    sync::{Arc, RwLock, Weak},
+    sync::RwLock,
 };
 
 pub extern crate lazy_static;
 
+mod alloc;
+use alloc::Allocator;
 #[cfg(test)]
 mod test;
 
@@ -288,17 +290,17 @@ pub trait HashConsed {
 }
 
 /// A hashconsed value.
-pub struct HConsed<T> {
+pub struct HConsed<T, Alloc: Allocator<T>=alloc::DefaultAllocator> {
     /// The actual element.
-    elm: Arc<T>,
+    elm: Alloc::Strong,
     /// Unique identifier of the element.
     uid: u64,
 }
-impl<T> HashConsed for HConsed<T> {
+impl<T, A: Allocator<T>> HashConsed for HConsed<T, A> {
     type Inner = T;
 }
 
-impl<T> HConsed<T> {
+impl<T, A: Allocator<T>> HConsed<T, A> {
     /// The inner element. Can also be accessed *via* dereferencing.
     #[inline]
     pub fn get(&self) -> &T {
@@ -311,31 +313,34 @@ impl<T> HConsed<T> {
     }
     /// Turns a hashconsed thing in a weak hashconsed thing.
     #[inline]
-    pub fn to_weak(&self) -> WHConsed<T> {
+    pub fn to_weak(&self) -> WHConsed<T, A> {
+        use alloc::Arc;
         WHConsed {
-            elm: Arc::downgrade(&self.elm),
+            elm: self.elm.downgrade(),
             uid: self.uid,
         }
     }
 
     /// Weak reference version.
-    pub fn to_weak_ref(&self) -> Weak<T> {
-        Arc::downgrade(&self.elm)
+    pub fn to_weak_ref(&self) -> A::Weak {
+        use alloc::Arc;
+        self.elm.downgrade()
     }
 
     /// Number of (strong) references to this term.
     pub fn arc_count(&self) -> usize {
-        Arc::strong_count(&self.elm)
+        use alloc::Arc;
+        self.elm.strong_count()
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
+impl<T: fmt::Debug, A: Allocator<T>> fmt::Debug for HConsed<T, A> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "{:?}", self.elm)
+        write!(fmt, "{:?}", self.elm.deref())
     }
 }
 
-impl<T> Clone for HConsed<T> {
+impl<T, A: Allocator<T>> Clone for HConsed<T, A> {
     fn clone(&self) -> Self {
         HConsed {
             elm: self.elm.clone(),
@@ -344,26 +349,26 @@ impl<T> Clone for HConsed<T> {
     }
 }
 
-impl<T> PartialEq for HConsed<T> {
+impl<T, A: Allocator<T>> PartialEq for HConsed<T, A> {
     #[inline]
     fn eq(&self, rhs: &Self) -> bool {
         self.uid == rhs.uid
     }
 }
-impl<T> Eq for HConsed<T> {}
-impl<T> PartialOrd for HConsed<T> {
+impl<T, A: Allocator<T>> Eq for HConsed<T, A> {}
+impl<T, A: Allocator<T>> PartialOrd for HConsed<T, A> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.uid.partial_cmp(&other.uid)
     }
 }
-impl<T> Ord for HConsed<T> {
+impl<T, A: Allocator<T>> Ord for HConsed<T, A> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.uid.cmp(&other.uid)
     }
 }
-impl<T: Hash> Hash for HConsed<T> {
+impl<T: Hash, A: Allocator<T>> Hash for HConsed<T, A> {
     #[inline]
     fn hash<H>(&self, state: &mut H)
     where
@@ -373,7 +378,7 @@ impl<T: Hash> Hash for HConsed<T> {
     }
 }
 
-impl<T> Deref for HConsed<T> {
+impl<T, A: Allocator<T>> Deref for HConsed<T, A> {
     type Target = T;
     #[inline]
     fn deref(&self) -> &T {
@@ -381,7 +386,7 @@ impl<T> Deref for HConsed<T> {
     }
 }
 
-impl<T: fmt::Display> fmt::Display for HConsed<T> {
+impl<T: fmt::Display, A: Allocator<T>> fmt::Display for HConsed<T, A> {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         self.elm.fmt(fmt)
@@ -389,15 +394,16 @@ impl<T: fmt::Display> fmt::Display for HConsed<T> {
 }
 
 /// Weak version of `HConsed`.
-pub struct WHConsed<T> {
+pub struct WHConsed<T, Alloc: Allocator<T>=alloc::DefaultAllocator> {
     /// The actual element.
-    elm: Weak<T>,
+    elm: Alloc::Weak,
     /// Unique identifier of the element.
     uid: u64,
 }
-impl<T> WHConsed<T> {
+impl<T, A: Allocator<T>> WHConsed<T, A> {
     /// Turns a weak hashconsed thing in a hashconsed thing.
-    pub fn to_hconsed(&self) -> Option<HConsed<T>> {
+    pub fn to_hconsed(&self) -> Option<HConsed<T, A>> {
+        use alloc::Weak;
         self.elm.upgrade().map(|arc| HConsed {
             elm: arc,
             uid: self.uid,
@@ -405,14 +411,15 @@ impl<T> WHConsed<T> {
     }
 
     /// A reference to the underlying weak reference.
-    pub fn as_weak_ref(&self) -> &Weak<T> {
+    pub fn as_weak_ref(&self) -> &A::Weak {
         &self.elm
     }
 }
 
-impl<T: fmt::Display> fmt::Display for WHConsed<T> {
+impl<T: fmt::Display, A: Allocator<T>> fmt::Display for WHConsed<T, A> {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use alloc::Weak;
         if let Some(arc) = self.elm.upgrade() {
             arc.fmt(fmt)
         } else {
@@ -421,7 +428,7 @@ impl<T: fmt::Display> fmt::Display for WHConsed<T> {
     }
 }
 
-impl<T> Hash for WHConsed<T> {
+impl<T, A: Allocator<T>> Hash for WHConsed<T, A> {
     #[inline]
     fn hash<H>(&self, state: &mut H)
     where
@@ -431,20 +438,20 @@ impl<T> Hash for WHConsed<T> {
     }
 }
 
-impl<T> PartialEq for WHConsed<T> {
+impl<T, A: Allocator<T>> PartialEq for WHConsed<T, A> {
     #[inline]
     fn eq(&self, rhs: &Self) -> bool {
         self.uid == rhs.uid
     }
 }
-impl<T> Eq for WHConsed<T> {}
-impl<T> PartialOrd for WHConsed<T> {
+impl<T, A: Allocator<T>> Eq for WHConsed<T, A> {}
+impl<T, A: Allocator<T>> PartialOrd for WHConsed<T, A> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.uid.partial_cmp(&other.uid)
     }
 }
-impl<T> Ord for WHConsed<T> {
+impl<T, A: Allocator<T>> Ord for WHConsed<T, A> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.uid.cmp(&other.uid)
@@ -452,20 +459,23 @@ impl<T> Ord for WHConsed<T> {
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HConsign<T: Hash + Eq + Clone, S = RandomState> {
+pub struct HConsign<T: Hash + Eq + Clone, S = RandomState, Alloc: Allocator<T>=alloc::DefaultAllocator> {
     /// The actual hash consing table.
-    table: HashMap<T, WHConsed<T>, S>,
+    table: HashMap<T, WHConsed<T, Alloc>, S>,
     /// Counter for uids.
     count: u64,
+
+    allocator: Alloc,
 }
 
-impl<T: Hash + Eq + Clone> HConsign<T, RandomState> {
+impl<T: Hash + Eq + Clone, A: Allocator<T>> HConsign<T, RandomState, A> {
     /// Creates an empty consign.
     #[inline]
     pub fn empty() -> Self {
         HConsign {
             table: HashMap::new(),
             count: 0,
+            allocator: Default::default(),
         }
     }
 
@@ -475,16 +485,17 @@ impl<T: Hash + Eq + Clone> HConsign<T, RandomState> {
         HConsign {
             table: HashMap::with_capacity(capacity),
             count: 0,
+            allocator: Default::default(),
         }
     }
 }
 
-impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
+impl<T: Hash + Eq + Clone, S, A: Allocator<T>> HConsign<T, S, A> {
     /// Fold on the elements stored in the consign.
     #[inline]
     pub fn fold<Acc, F>(&self, mut init: Acc, mut f: F) -> Acc
     where
-        F: FnMut(Acc, HConsed<T>) -> Acc,
+        F: FnMut(Acc, HConsed<T, A>) -> Acc,
     {
         for weak in self.table.values() {
             if let Some(consed) = weak.to_hconsed() {
@@ -498,7 +509,7 @@ impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
     #[inline]
     pub fn fold_res<Acc, F, E>(&self, mut init: Acc, mut f: F) -> Result<Acc, E>
     where
-        F: FnMut(Acc, HConsed<T>) -> Result<Acc, E>,
+        F: FnMut(Acc, HConsed<T, A>) -> Result<Acc, E>,
     {
         for weak in self.table.values() {
             if let Some(consed) = weak.to_hconsed() {
@@ -526,13 +537,14 @@ impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
     }
 }
 
-impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
+impl<T: Hash + Eq + Clone, S: BuildHasher, A: Allocator<T>> HConsign<T, S, A> {
     /// Creates an empty consign with a custom hash
     #[inline]
     pub fn with_hasher(build_hasher: S) -> Self {
         HConsign {
             table: HashMap::with_hasher(build_hasher),
             count: 0,
+            allocator: Default::default(),
         }
     }
 
@@ -542,6 +554,7 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
         HConsign {
             table: HashMap::with_capacity_and_hasher(capacity, build_hasher),
             count: 0,
+            allocator: Default::default(),
         }
     }
 
@@ -554,7 +567,7 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
     ///
     /// This is checked in `debug` but not `release`.
     #[inline]
-    fn insert(&mut self, key: T, wconsed: WHConsed<T>) {
+    fn insert(&mut self, key: T, wconsed: WHConsed<T, A>) {
         let prev = self.table.insert(key, wconsed);
         debug_assert!(match prev {
             None => true,
@@ -564,7 +577,7 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
 
     /// Attempts to retrieve an *upgradable* value from the map.
     #[inline]
-    fn get(&self, key: &T) -> Option<HConsed<T>> {
+    fn get(&self, key: &T) -> Option<HConsed<T, A>> {
         if let Some(old) = self.table.get(key) {
             old.to_hconsed()
         } else {
@@ -573,7 +586,7 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
     }
 }
 
-impl<T: Hash + Eq + Clone, S> fmt::Display for HConsign<T, S>
+impl<T: Hash + Eq + Clone, S, A: Allocator<T>> fmt::Display for HConsign<T, S, A>
 where
     T: Hash + fmt::Display,
 {
@@ -590,7 +603,7 @@ where
 ///
 /// Implemented *via* a trait to be able to extend `RwLock` for lazy static
 /// consigns.
-pub trait HashConsign<T: Hash>: Sized {
+pub trait HashConsign<T: Hash, A: Allocator<T>>: Sized {
     /// Hashconses something and returns the hash consed version.
     ///
     /// Returns `true` iff the element
@@ -598,10 +611,10 @@ pub trait HashConsign<T: Hash>: Sized {
     /// - was not in the consign at all, or
     /// - was in the consign but it is not referenced (weak ref cannot be
     ///   upgraded.)
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool);
+    fn mk_is_new(self, elm: T) -> (HConsed<T, A>, bool);
 
     /// Creates a HConsed element.
-    fn mk(self, elm: T) -> HConsed<T> {
+    fn mk(self, elm: T) -> HConsed<T, A> {
         self.mk_is_new(elm).0
     }
 
@@ -620,16 +633,16 @@ pub trait HashConsign<T: Hash>: Sized {
     /// Reserves capacity for at least `additional` more elements.
     fn reserve(self, additional: usize);
 }
-impl<'a, T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &'a mut HConsign<T, S> {
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
+impl<'a, T: Hash + Eq + Clone, S: BuildHasher, A: Allocator<T>> HashConsign<T, A> for &'a mut HConsign<T, S, A> {
+    fn mk_is_new(self, elm: T) -> (HConsed<T, A>, bool) {
         // If the element is known and upgradable return it.
         if let Some(hconsed) = self.get(&elm) {
             debug_assert!(*hconsed.elm == elm);
             return (hconsed, false);
         }
         // Otherwise build hconsed version.
-        let hconsed = HConsed {
-            elm: Arc::new(elm.clone()),
+        let hconsed: HConsed<T, A> = HConsed {
+            elm: self.allocator.alloc(elm.clone()),
             uid: self.count,
         };
         // Increment uid count.
@@ -648,6 +661,7 @@ impl<'a, T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &'a mut HConsi
             max_uid = None;
 
             self.table.retain(|_key, val| {
+                use alloc::Weak;
                 if val.elm.strong_count() > 0 {
                     let max = max_uid.get_or_insert(val.uid);
                     if *max < val.uid {
@@ -693,10 +707,10 @@ macro_rules! get {
     };
 }
 
-impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
+impl<'a, T: Hash + Eq + Clone, A: Allocator<T>> HashConsign<T, A> for &'a RwLock<HConsign<T, RandomState, A>> {
     /// If the element is already in the consign, only read access will be
     /// requested.
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
+    fn mk_is_new(self, elm: T) -> (HConsed<T, A>, bool) {
         // Request read and check if element already exists.
         {
             let slf = get!(read on self);
@@ -716,8 +730,8 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
         }
 
         // Otherwise build hconsed version.
-        let hconsed = HConsed {
-            elm: Arc::new(elm.clone()),
+        let hconsed: HConsed<T, A> = HConsed {
+            elm: slf.allocator.alloc(elm.clone()),
             uid: slf.count,
         };
         // Increment uid count.
