@@ -1,3 +1,45 @@
+//! The derive attribute implementation for the hashconsing crate
+//!
+//! This automatically generates some of the boilerplate that is needed in the standard use case of hashconsing.
+//!
+//! There are two parts to this:
+//! - the static factory which can be referenced as `<Your Type>_FACTORY`
+//! - A series of constructor functions for creating each of the variants
+//!
+//! 
+//!
+//! Example:
+//! ```rust
+//! use hashconsing::hcons;
+//! use std::ops::Deref;
+//!
+//! // Can optionally turn off the factory or the constructor generation
+//! // #[hcons(name = "Type", no_factory, no_constructors)]
+//! #[hcons(name = "Type")]
+//! #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+//! pub enum ActualType {
+//! Named(String),
+//! Arrow(Type, Type),
+//! Tuple(Vec<Type>),
+//! Mu(String, Type),
+//! Variant(Vec<(String, Type)>),
+//! }
+//!
+//! impl ActualType {
+//!     pub fn is_named(&self) -> bool {
+//!         matches!(self, Self::Named(_))
+//!     }
+//! }
+//!
+//! fn main() {
+//!     let named_type = Type::Named("int".to_string());
+//!     // Dereferences to the underlying type with access to methods
+//!     assert!(named_type.is_named());
+//!     let tuple = Type::Tuple(vec![named_type]);
+//!     assert!(!tuple.is_named());
+//! }
+//! ```
+
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
@@ -5,8 +47,7 @@ use proc_macro_error::{abort_call_site, proc_macro_error};
 use quote::{format_ident, quote};
 use syn::{
     parse_macro_input, punctuated::Punctuated, token::Paren, Data, DataEnum, DeriveInput, Expr,
-    ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments, PathSegment,
-    Token,
+    ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments, PathSegment, Token,
 };
 
 #[derive(Debug, Default, FromMeta)]
@@ -63,11 +104,11 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     let hash_struct = quote! {
         #(#attrs)*
         #[automatically_derived]
-        #vis struct #struct_name(HConsed<#ident>);
+        #vis struct #struct_name(hashconsing::HConsed<#ident>);
 
         #[automatically_derived]
         impl std::ops::Deref for #struct_name {
-            type Target = HConsed<#ident>;
+            type Target = hashconsing::HConsed<#ident>;
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
@@ -75,7 +116,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     };
 
     let hash_factory = quote! {
-        consign! {
+        hashconsing::consign! {
             let #factory_name = consign(50) for #ident ;
         }
     };
@@ -167,6 +208,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
                 #[allow(non_snake_case)]
                 impl #struct_name {
                     #(pub fn #variant_names(#variant_field_function_args) -> Self {
+                        use hashconsing::HashConsign;
                         Self(#factory_name.mk(#variant_field_calling_args))
                     })*
                 }
