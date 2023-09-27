@@ -1,12 +1,12 @@
-use darling::{util::Flag, FromMeta, Result};
+use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
 use proc_macro_error::{abort_call_site, proc_macro_error};
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, punctuated::Punctuated, token::Paren, AttributeArgs, Data, DataEnum,
-    DeriveInput, Expr, ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments,
-    PathSegment, Token,
+    parse_macro_input, punctuated::Punctuated, token::Paren, Data, DataEnum, DeriveInput, Expr,
+    ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments, PathSegment,
+    Token,
 };
 
 #[derive(Debug, Default, FromMeta)]
@@ -32,7 +32,14 @@ impl MacroArgs {
 #[proc_macro_attribute]
 pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     let parsed_input = input.clone();
-    let attr_args = parse_macro_input!(args as AttributeArgs);
+
+    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+        Ok(v) => v,
+        Err(e) => {
+            return TokenStream::from(Error::from(e).write_errors());
+        }
+    };
+
     let DeriveInput {
         ident,
         vis,
