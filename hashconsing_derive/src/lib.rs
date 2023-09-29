@@ -6,7 +6,7 @@
 //! - the static factory which can be referenced as `<Your Type>_FACTORY`
 //! - A series of constructor functions for creating each of the variants
 //!
-//! 
+//!
 //!
 //! Example:
 //! ```rust
@@ -31,13 +31,11 @@
 //!     }
 //! }
 //!
-//! fn main() {
-//!     let named_type = Type::Named("int".to_string());
-//!     // Dereferences to the underlying type with access to methods
-//!     assert!(named_type.is_named());
-//!     let tuple = Type::Tuple(vec![named_type]);
-//!     assert!(!tuple.is_named());
-//! }
+//! let named_type = Type::Named("int".to_string());
+//! // Dereferences to the underlying type with access to methods
+//! assert!(named_type.is_named());
+//! let tuple = Type::Tuple(vec![named_type]);
+//! assert!(!tuple.is_named());
 //! ```
 
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
