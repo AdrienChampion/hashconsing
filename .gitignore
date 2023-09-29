@@ -2,7 +2,7 @@
 *.lock
 
 # Ignore target directory.
-/target
+**/target
 
 # Ignore crappy mac files.
 .DS_Store
