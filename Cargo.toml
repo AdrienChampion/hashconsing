@@ -26,14 +26,14 @@ with_ahash = ["ahash"]
 unstable_docrs = ["with_ahash"]
 
 [dependencies]
-lazy_static = "1.*"
+lazy_static = "^1.4"
 
 [dependencies.ahash]
-version = "^0.8.3"
+version = "^0.8.9"
 optional = true
 
 [dev-dependencies]
 crossbeam-utils = "^0.8"
 trybuild = "^1.0"
-rayon = "^1.5"
+rayon = "^1.8"
 rand = "0.8"
