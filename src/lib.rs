@@ -312,13 +312,13 @@ impl<T> HConsed<T> {
 
     /// Clones the underlying reference.
     #[inline]
-    pub fn to_ref(&self) -> Arc<T> {
+    pub fn to_arc(&self) -> Arc<T> {
         self.elm.clone()
     }
 
     /// Exposes the underlying reference.
     #[inline]
-    pub fn as_ref(&self) -> &Arc<T> {
+    pub fn as_arc(&self) -> &Arc<T> {
         &self.elm
     }
 
@@ -368,18 +368,22 @@ impl<T> PartialEq for HConsed<T> {
     }
 }
 impl<T> Eq for HConsed<T> {}
+
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for HConsed<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.uid.partial_cmp(&other.uid)
     }
 }
+
 impl<T> Ord for HConsed<T> {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.uid.cmp(&other.uid)
     }
 }
+
 impl<T: Hash> Hash for HConsed<T> {
     #[inline]
     fn hash<H>(&self, state: &mut H)
@@ -455,6 +459,8 @@ impl<T> PartialEq for WHConsed<T> {
     }
 }
 impl<T> Eq for WHConsed<T> {}
+
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for WHConsed<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
