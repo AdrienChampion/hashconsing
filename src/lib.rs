@@ -309,7 +309,25 @@ impl<T> HConsed<T> {
     pub fn uid(&self) -> u64 {
         self.uid
     }
-    /// Turns a hashconsed thing in a weak hashconsed thing.
+
+    /// Clones the underlying reference.
+    #[inline]
+    pub fn to_ref(&self) -> Arc<T> {
+        self.elm.clone()
+    }
+
+    /// Exposes the underlying reference.
+    #[inline]
+    pub fn as_ref(&self) -> &Arc<T> {
+        &self.elm
+    }
+
+    /// Generates a weak version of the underlying reference.
+    pub fn to_weak_ref(&self) -> Weak<T> {
+        Arc::downgrade(&self.elm)
+    }
+
+    /// Creates a weak version of itself.
     #[inline]
     pub fn to_weak(&self) -> WHConsed<T> {
         WHConsed {
@@ -318,14 +336,13 @@ impl<T> HConsed<T> {
         }
     }
 
-    /// Weak reference version.
-    pub fn to_weak_ref(&self) -> Weak<T> {
-        Arc::downgrade(&self.elm)
-    }
-
     /// Number of (strong) references to this term.
     pub fn arc_count(&self) -> usize {
         Arc::strong_count(&self.elm)
+    }
+    /// Number of weak references to this term.
+    pub fn weak_count(&self) -> usize {
+        Arc::weak_count(&self.elm)
     }
 }
 
