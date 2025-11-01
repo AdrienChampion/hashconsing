@@ -216,6 +216,7 @@
 #![deny(warnings)]
 
 use std::{
+    borrow::Borrow,
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     collections::{hash_map::RandomState, HashMap},
     fmt,
@@ -378,6 +379,11 @@ impl<T> Deref for HConsed<T> {
     #[inline]
     fn deref(&self) -> &T {
         self.elm.deref()
+    }
+}
+impl<T> Borrow<T> for HConsed<T> {
+    fn borrow(&self) -> &T {
+        self.elm.borrow()
     }
 }
 
