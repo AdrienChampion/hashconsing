@@ -18,24 +18,40 @@
 //! #[hcons(name = "Type")]
 //! #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 //! pub enum ActualType {
-//! Named(String),
-//! Arrow(Type, Type),
-//! Tuple(Vec<Type>),
-//! Mu(String, Type),
-//! Variant(Vec<(String, Type)>),
+//!     // Tuple-style variants
+//!     Named(String),
+//!     Arrow(Type, Type),
+//!     Tuple(Vec<Type>),
+//!     Mu(String, Type),
+//!     Variant(Vec<(String, Type)>),
+//!     // Struct-style variant
+//!     Record { fields: Vec<(String, Type)>, is_open: bool },
+//!     // Unit variant
+//!     Unit,
 //! }
 //!
 //! impl ActualType {
 //!     pub fn is_named(&self) -> bool {
 //!         matches!(self, Self::Named(_))
 //!     }
+//!     pub fn is_record(&self) -> bool {
+//!         matches!(self, Self::Record { .. })
+//!     }
 //! }
 //!
 //! let named_type = Type::Named("int".to_string());
 //! // Dereferences to the underlying type with access to methods
 //! assert!(named_type.is_named());
-//! let tuple = Type::Tuple(vec![named_type]);
+//! let tuple = Type::Tuple(vec![named_type.clone()]);
 //! assert!(!tuple.is_named());
+//!
+//! // Struct-style variant with named fields
+//! let record = Type::Record(vec![("x".to_string(), named_type)], false);
+//! assert!(record.is_record());
+//!
+//! // Unit variant
+//! let unit = Type::Unit();
+//! assert!(!unit.is_named());
 //! ```
 
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
@@ -44,8 +60,9 @@ use proc_macro2::Span;
 use proc_macro_error::{abort_call_site, proc_macro_error};
 use quote::{format_ident, quote};
 use syn::{
-    parse_macro_input, punctuated::Punctuated, token::Paren, Data, DataEnum, DeriveInput, Expr,
-    ExprCall, ExprPath, FnArg, Pat, PatIdent, PatType, Path, PathArguments, PathSegment, Token,
+    parse_macro_input, punctuated::Punctuated, token::Brace, token::Paren, Data, DataEnum,
+    DeriveInput, Expr, ExprCall, ExprPath, ExprStruct, FieldValue, Fields, FnArg, Member, Pat,
+    PatIdent, PatType, Path, PathArguments, PathSegment, Token,
 };
 
 #[derive(Debug, Default, FromMeta)]
@@ -128,76 +145,144 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
             ) = variants
                 .iter()
                 .map(|v| {
-                    let (arg_names, arg_types): (Vec<Expr>, Vec<FnArg>) = v
-                        .fields
-                        .iter()
-                        .enumerate()
-                        .map(|(i, f)| {
-                            let id = format_ident!("args{}", i);
-                            (
-                                {
-                                    ExprPath {
-                                        attrs: Vec::new(),
-                                        qself: None,
-                                        path: Path {
-                                            leading_colon: None,
-                                            segments: Punctuated::from_iter(vec![PathSegment {
-                                                ident: id.clone(),
-                                                arguments: PathArguments::None,
-                                            }]),
-                                        },
-                                    }
-                                    .into()
-                                },
-                                FnArg::Typed(PatType {
-                                    attrs: Vec::new(),
-                                    pat: Box::new(Pat::Ident(PatIdent {
-                                        attrs: Vec::new(),
-                                        by_ref: None,
-                                        mutability: None,
-                                        ident: id,
-                                        subpat: None,
-                                    })),
-                                    colon_token: Token![:](Span::call_site()),
-                                    ty: Box::new(f.ty.clone()),
-                                }),
-                            )
-                        })
-                        .unzip();
-
-                    let calling_args = Punctuated::from_iter(arg_names);
-
-                    let variant_name = Expr::Path(ExprPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: Path {
-                            leading_colon: None,
-                            segments: Punctuated::from_iter(vec![
-                                PathSegment {
-                                    ident: ident.clone(),
-                                    arguments: PathArguments::None,
-                                },
-                                PathSegment {
-                                    ident: v.ident.clone(),
-                                    arguments: PathArguments::None,
-                                },
-                            ]),
-                        },
-                    });
-
-                    let variant_expr = if calling_args.is_empty() {
-                        variant_name
-                    } else {
-                        ExprCall {
-                            attrs: Vec::new(),
-                            func: Box::new(variant_name),
-                            paren_token: Paren(Span::call_site()),
-                            args: calling_args,
-                        }
-                        .into()
+                    let variant_path = Path {
+                        leading_colon: None,
+                        segments: Punctuated::from_iter(vec![
+                            PathSegment {
+                                ident: ident.clone(),
+                                arguments: PathArguments::None,
+                            },
+                            PathSegment {
+                                ident: v.ident.clone(),
+                                arguments: PathArguments::None,
+                            },
+                        ]),
                     };
 
-                    (Punctuated::from_iter(arg_types), variant_expr)
+                    match &v.fields {
+                        Fields::Named(named_fields) => {
+                            // Struct-like variant: MyVariant { field_1: Type, field_2: Type }
+                            let (field_values, fn_args): (Vec<FieldValue>, Vec<FnArg>) =
+                                named_fields
+                                    .named
+                                    .iter()
+                                    .map(|f| {
+                                        let field_ident = f.ident.clone().unwrap();
+                                        (
+                                            FieldValue {
+                                                attrs: Vec::new(),
+                                                member: Member::Named(field_ident.clone()),
+                                                colon_token: None, // shorthand syntax
+                                                expr: Expr::Path(ExprPath {
+                                                    attrs: Vec::new(),
+                                                    qself: None,
+                                                    path: Path {
+                                                        leading_colon: None,
+                                                        segments: Punctuated::from_iter(vec![
+                                                            PathSegment {
+                                                                ident: field_ident.clone(),
+                                                                arguments: PathArguments::None,
+                                                            },
+                                                        ]),
+                                                    },
+                                                }),
+                                            },
+                                            FnArg::Typed(PatType {
+                                                attrs: Vec::new(),
+                                                pat: Box::new(Pat::Ident(PatIdent {
+                                                    attrs: Vec::new(),
+                                                    by_ref: None,
+                                                    mutability: None,
+                                                    ident: field_ident,
+                                                    subpat: None,
+                                                })),
+                                                colon_token: Token![:](Span::call_site()),
+                                                ty: Box::new(f.ty.clone()),
+                                            }),
+                                        )
+                                    })
+                                    .unzip();
+
+                            let variant_expr = ExprStruct {
+                                attrs: Vec::new(),
+                                qself: None,
+                                path: variant_path,
+                                brace_token: Brace(Span::call_site()),
+                                fields: Punctuated::from_iter(field_values),
+                                dot2_token: None,
+                                rest: None,
+                            };
+
+                            (Punctuated::from_iter(fn_args), variant_expr.into())
+                        }
+                        Fields::Unnamed(_) => {
+                            // Tuple-like variant: MyVariant(Type1, Type2)
+                            let (arg_names, arg_types): (Vec<Expr>, Vec<FnArg>) = v
+                                .fields
+                                .iter()
+                                .enumerate()
+                                .map(|(i, f)| {
+                                    let id = format_ident!("args{}", i);
+                                    (
+                                        {
+                                            ExprPath {
+                                                attrs: Vec::new(),
+                                                qself: None,
+                                                path: Path {
+                                                    leading_colon: None,
+                                                    segments: Punctuated::from_iter(vec![
+                                                        PathSegment {
+                                                            ident: id.clone(),
+                                                            arguments: PathArguments::None,
+                                                        },
+                                                    ]),
+                                                },
+                                            }
+                                            .into()
+                                        },
+                                        FnArg::Typed(PatType {
+                                            attrs: Vec::new(),
+                                            pat: Box::new(Pat::Ident(PatIdent {
+                                                attrs: Vec::new(),
+                                                by_ref: None,
+                                                mutability: None,
+                                                ident: id,
+                                                subpat: None,
+                                            })),
+                                            colon_token: Token![:](Span::call_site()),
+                                            ty: Box::new(f.ty.clone()),
+                                        }),
+                                    )
+                                })
+                                .unzip();
+
+                            let calling_args = Punctuated::from_iter(arg_names);
+                            let variant_name = Expr::Path(ExprPath {
+                                attrs: Vec::new(),
+                                qself: None,
+                                path: variant_path,
+                            });
+
+                            let variant_expr = ExprCall {
+                                attrs: Vec::new(),
+                                func: Box::new(variant_name),
+                                paren_token: Paren(Span::call_site()),
+                                args: calling_args,
+                            };
+
+                            (Punctuated::from_iter(arg_types), variant_expr.into())
+                        }
+                        Fields::Unit => {
+                            // Unit variant: MyVariant
+                            let variant_expr = Expr::Path(ExprPath {
+                                attrs: Vec::new(),
+                                qself: None,
+                                path: variant_path,
+                            });
+
+                            (Punctuated::new(), variant_expr)
+                        }
+                    }
                 })
                 .unzip();
 
