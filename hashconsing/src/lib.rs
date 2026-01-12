@@ -248,8 +248,7 @@ mod test;
 /// - `$capa:expr` initial capacity when creating the consign ;
 /// - `$hash_builder:expr` optional hash builder, an
 ///   implementation of [`std::hash::BuildHasher`] ;
-/// - `$typ:typ,` type being hashconsed (the underlying type, not the
-///   hashconsed one) ;
+/// - `$typ:typ,` type being hashconsed (the underlying type, not the hashconsed one) ;
 #[macro_export]
 macro_rules! consign {
     (
