@@ -460,37 +460,33 @@ use weak_table::traits::{WeakElement, WeakKey};
 
 #[cfg(feature = "weak-table")]
 impl<T> WeakElement for WHConsed<T> {
-   type Strong = HConsed<T>;
-	fn new(x: &Self::Strong) -> Self
-	{
-      x.to_weak()
-	}
-	fn view(&self) -> Option<Self::Strong>
-	{
-      self.to_hconsed()
-	}
-	fn is_expired(&self) -> bool
-	{
-		self.elm.is_expired()
-	}
-	fn clone(x: &Self::Strong) -> Self::Strong
-	where
-		Self: Sized,
-	{
-		x.clone()
-	}
+    type Strong = HConsed<T>;
+    fn new(x: &Self::Strong) -> Self {
+        x.to_weak()
+    }
+    fn view(&self) -> Option<Self::Strong> {
+        self.to_hconsed()
+    }
+    fn is_expired(&self) -> bool {
+        self.elm.is_expired()
+    }
+    fn clone(x: &Self::Strong) -> Self::Strong
+    where
+        Self: Sized,
+    {
+        x.clone()
+    }
 }
 #[cfg(feature = "weak-table")]
 impl<T: std::hash::Hash + Eq> WeakKey for WHConsed<T> {
-	type Key = T;
-	fn with_key<F, R>(view: &Self::Strong, f: F) -> R
-	where
-		F: FnOnce(&Self::Key) -> R,
-	{
-		f(view)
-	}
+    type Key = T;
+    fn with_key<F, R>(view: &Self::Strong, f: F) -> R
+    where
+        F: FnOnce(&Self::Key) -> R,
+    {
+        f(view)
+    }
 }
-
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
 pub struct HConsign<T: Hash + Eq + Clone, S = RandomState> {
