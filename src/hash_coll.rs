@@ -42,11 +42,11 @@
 //! be the natural one, *e.g.* `HConSet<Term>`.
 //!
 //! However, since `Term` is really an alias for `HConsed<RTerm>`, then if we wanted to declare
-//! `HConSet` as an alias for `HashSet` we would get `type HConSet<Inner> = HashSet< HConsed<Inner>
-//! >` (omitting the custom hasher). That is, our sets would have type `HConSet<RTerm>`, which is
-//! not very pretty. We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it
-//! turns out it's better to wrap the actual set in a `struct` anyway. Mostly to be able to define
-//! `new` and `with_capacity` without relying on a trait (users would need to import) to do that.
+//! `HConSet` as an alias for `HashSet` we would get `type HConSet<Inner> = HashSet<HConsed<Inner>>`
+//! (omitting the custom hasher). That is, our sets would have type `HConSet<RTerm>`, which is not
+//! very pretty. We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it turns
+//! out it's better to wrap the actual set in a `struct` anyway. Mostly to be able to define `new`
+//! and `with_capacity` without relying on a trait (users would need to import) to do that.
 //!
 //! So actually `HConsed` types automatically implement the internal `trait HashConsed { type Inner;
 //! }`. The sole purpose of this trait (currently) is to pass the inner type implicitly thanks to a
@@ -322,7 +322,7 @@ where
 {
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter(&self) -> ::std::collections::hash_set::Iter<HConsed<T::Inner>> {
+    pub fn iter<'a>(&'a self) -> ::std::collections::hash_set::Iter<'a, HConsed<T::Inner>> {
         self.set.iter()
     }
 }
@@ -520,12 +520,14 @@ where
 {
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter(&self) -> ::std::collections::hash_map::Iter<HConsed<T::Inner>, V> {
+    pub fn iter<'a>(&'a self) -> ::std::collections::hash_map::Iter<'a, HConsed<T::Inner>, V> {
         self.map.iter()
     }
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter_mut(&mut self) -> ::std::collections::hash_map::IterMut<HConsed<T::Inner>, V> {
+    pub fn iter_mut<'a>(
+        &'a mut self,
+    ) -> ::std::collections::hash_map::IterMut<'a, HConsed<T::Inner>, V> {
         self.map.iter_mut()
     }
 }
@@ -643,7 +645,7 @@ mod hash {
     impl HashU64 {
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(debug)]
+        #[cfg(debug_assertions)]
         #[inline(always)]
         fn test_bytes(bytes: &[u8]) {
             if bytes.len() != 8 {
@@ -657,13 +659,13 @@ mod hash {
         }
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(not(debug))]
+        #[cfg(not(debug_assertions))]
         #[inline(always)]
         fn test_bytes(_: &[u8]) {}
     }
     impl Hasher for HashU64 {
         fn finish(&self) -> u64 {
-            let block: u64 = unsafe { ::std::mem::transmute(self.buf) };
+            let block: u64 = u64::from_ne_bytes(self.buf);
             // Multiply by random 64-bit prime to distribute
             block.wrapping_mul(0xDA5DF7A7BD02F2C7u64)
         }

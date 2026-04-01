@@ -213,6 +213,8 @@
 //! [lazy static]: https://crates.io/crates/lazy_static
 //! (lazy_static library on crates.io)
 
+#![deny(warnings)]
+
 use std::{
     borrow::Borrow,
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
@@ -239,7 +241,7 @@ mod test;
 /// - `$hash_builder:expr` optional hash builder, an
 ///   implementation of [`std::hash::BuildHasher`] ;
 /// - `$typ:typ,` type being hashconsed (the underlying type, not the
-///     hashconsed one) ;
+///   hashconsed one) ;
 #[macro_export]
 macro_rules! consign {
     (
@@ -353,7 +355,7 @@ impl<T> Eq for HConsed<T> {}
 impl<T> PartialOrd for HConsed<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.uid.partial_cmp(&other.uid)
+        Some(self.cmp(other))
     }
 }
 impl<T> Ord for HConsed<T> {
@@ -445,7 +447,7 @@ impl<T> Eq for WHConsed<T> {}
 impl<T> PartialOrd for WHConsed<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.uid.partial_cmp(&other.uid)
+        Some(self.cmp(other))
     }
 }
 impl<T> Ord for WHConsed<T> {
@@ -672,7 +674,7 @@ pub trait HashConsign<T: Hash>: Sized {
     /// Reserves capacity for at least `additional` more elements.
     fn reserve(self, additional: usize);
 }
-impl<'a, T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &'a mut HConsign<T, S> {
+impl<T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &mut HConsign<T, S> {
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
         // If the element is known and upgradable return it.
         if let Some(hconsed) = self.get(&elm) {
@@ -745,7 +747,7 @@ macro_rules! get {
     };
 }
 
-impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
+impl<T: Hash + Eq + Clone> HashConsign<T> for &RwLock<HConsign<T>> {
     /// If the element is already in the consign, only read access will be
     /// requested.
     fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {

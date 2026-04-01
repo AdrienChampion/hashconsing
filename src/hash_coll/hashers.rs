@@ -50,7 +50,7 @@ pub mod p_hash {
     impl Hasher {
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(debug)]
+        #[cfg(debug_assertions)]
         #[inline(always)]
         fn test_bytes(bytes: &[u8]) {
             if bytes.len() != 8 {
@@ -64,13 +64,13 @@ pub mod p_hash {
         }
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(not(debug))]
+        #[cfg(not(debug_assertions))]
         #[inline(always)]
         fn test_bytes(_: &[u8]) {}
     }
     impl StdHasherExt for Hasher {
         fn finish(&self) -> u64 {
-            let block: u64 = unsafe { ::std::mem::transmute(self.buf) };
+            let block: u64 = u64::from_ne_bytes(self.buf);
             // Multiply by random 64-bit prime to distribute
             block.wrapping_mul(0xDA5DF7A7BD02F2C7u64)
         }
@@ -112,7 +112,7 @@ pub mod id_hash {
     impl Hasher {
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(debug)]
+        #[cfg(debug_assertions)]
         #[inline(always)]
         fn test_bytes(bytes: &[u8]) {
             if bytes.len() != 8 {
@@ -126,13 +126,13 @@ pub mod id_hash {
         }
         /// Checks that a slice of bytes has the length of a `usize`. Only active
         /// in debug.
-        #[cfg(not(debug))]
+        #[cfg(not(debug_assertions))]
         #[inline(always)]
         fn test_bytes(_: &[u8]) {}
     }
     impl StdHasherExt for Hasher {
         fn finish(&self) -> u64 {
-            unsafe { ::std::mem::transmute(self.buf) }
+            u64::from_ne_bytes(self.buf)
         }
         fn write(&mut self, bytes: &[u8]) {
             Self::test_bytes(bytes);
