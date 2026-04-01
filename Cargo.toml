@@ -17,6 +17,7 @@ categories = [
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
 edition = "2021"
+rust-version = "1.60"
 
 [package.metadata.docs.rs]
 features = ["unstable_docrs"]
