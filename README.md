@@ -21,7 +21,12 @@ For more details see [the documentation][doc].
 
 MIT/Apache-2.0
 
-# Contributors
+# Developers
+
+- [@adrienchampion](https://github.com/adrienchampion), original author
+- [@lenianiva](https://github.com/lenianiva), maintainer
+
+## Contributors
 
 - [@alex-ozdemir](https://github.com/alex-ozdemir)
 

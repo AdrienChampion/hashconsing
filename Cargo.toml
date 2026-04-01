@@ -1,18 +1,21 @@
 [package]
 name = "hashconsing"
-version = "1.6.0"
-authors = ["Adrien Champion <adrien.champion@email.com>"]
+version = "1.7.0"
+authors = [
+  "Adrien Champion <adrien.champion@email.com>",
+  "Leni Aniva <aniva@stanford.edu>",
+]
 description = "A hash consing library."
 documentation = "https://docs.rs/hashconsing"
 homepage = "https://github.com/AdrienChampion/hashconsing"
 repository = "https://github.com/AdrienChampion/hashconsing"
 readme = "README.md"
 categories = [
-    "caching",
-    "compression",
-    "concurrency",
-    "data-structures",
-    "memory-management",
+  "caching",
+  "compression",
+  "concurrency",
+  "data-structures",
+  "memory-management",
 ]
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
