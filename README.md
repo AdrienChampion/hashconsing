@@ -12,11 +12,6 @@ efficient as uses Rust's `HashMap`s, not a custom built structure.
 
 For more details see [the documentation][doc].
 
-# Known projects using `hashconsing`
-
-- [kinō][kino], a model-checker for transition systems
-- [hoice][hoice], a machine-learning-based predicate synthesizer for horn clauses
-
 # License
 
 MIT/Apache-2.0
