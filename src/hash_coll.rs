@@ -42,11 +42,11 @@
 //! be the natural one, *e.g.* `HConSet<Term>`.
 //!
 //! However, since `Term` is really an alias for `HConsed<RTerm>`, then if we wanted to declare
-//! `HConSet` as an alias for `HashSet` we would get `type HConSet<Inner> = HashSet< HConsed<Inner>
-//! >` (omitting the custom hasher). That is, our sets would have type `HConSet<RTerm>`, which is
-//! not very pretty. We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it
-//! turns out it's better to wrap the actual set in a `struct` anyway. Mostly to be able to define
-//! `new` and `with_capacity` without relying on a trait (users would need to import) to do that.
+//! `HConSet` as an alias for `HashSet` we would get `type HConSet<Inner> = HashSet<HConsed<Inner>>`
+//! (omitting the custom hasher). That is, our sets would have type `HConSet<RTerm>`, which is not
+//! very pretty. We could just define an alias though: `type TermSet = HConSet<RTerm>`, but it turns
+//! out it's better to wrap the actual set in a `struct` anyway. Mostly to be able to define `new`
+//! and `with_capacity` without relying on a trait (users would need to import) to do that.
 //!
 //! So actually `HConsed` types automatically implement the internal `trait HashConsed { type Inner;
 //! }`. The sole purpose of this trait (currently) is to pass the inner type implicitly thanks to a
