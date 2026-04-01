@@ -456,7 +456,7 @@ impl<T> Ord for WHConsed<T> {
 }
 
 /// The consign storing the actual hash consed elements as `HConsed`s.
-pub struct HConsign<T: Hash + Eq + Clone, S = RandomState> {
+pub struct HConsign<T: Hash + Eq, S = RandomState> {
     /// The actual hash consing table.
     table: HashMap<T, WHConsed<T>, S>,
     /// Counter for uids.
@@ -530,7 +530,7 @@ impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
     }
 }
 
-impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
+impl<T: Hash + Eq, S: BuildHasher> HConsign<T, S> {
     /// Creates an empty consign with a custom hash
     #[inline]
     pub fn with_hasher(build_hasher: S) -> Self {
@@ -568,8 +568,11 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
 
     /// Attempts to retrieve an *upgradable* value from the map.
     #[inline]
-    fn get(&self, key: &T) -> Option<HConsed<T>> {
-        if let Some(old) = self.table.get(key) {
+    fn get<U: Eq + Hash + PartialEq<T>>(&self, key: &U) -> Option<HConsed<T>>
+    where
+        T: Borrow<U>,
+    {
+        if let Some(old) = self.table.get::<U>(key) {
             old.to_hconsed()
         } else {
             None
@@ -577,7 +580,7 @@ impl<T: Hash + Eq + Clone, S: BuildHasher> HConsign<T, S> {
     }
 }
 
-impl<T: Hash + Eq + Clone, S> fmt::Display for HConsign<T, S>
+impl<T: Hash + Eq, S> fmt::Display for HConsign<T, S>
 where
     T: Hash + fmt::Display,
 {
@@ -602,10 +605,15 @@ pub trait HashConsign<T: Hash>: Sized {
     /// - was not in the consign at all, or
     /// - was in the consign but it is not referenced (weak ref cannot be
     ///   upgraded.)
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool);
+    fn mk_is_new<S: Eq + HashIntern<T> + PartialEq<T> + Hash>(self, elm: S) -> (HConsed<T>, bool)
+    where
+        T: Borrow<S>;
 
     /// Creates a HConsed element.
-    fn mk(self, elm: T) -> HConsed<T> {
+    fn mk<S: Eq + HashIntern<T> + PartialEq<T> + Hash>(self, elm: S) -> HConsed<T>
+    where
+    T: Borrow<S>
+    {
         self.mk_is_new(elm).0
     }
 
@@ -624,22 +632,26 @@ pub trait HashConsign<T: Hash>: Sized {
     /// Reserves capacity for at least `additional` more elements.
     fn reserve(self, additional: usize);
 }
-impl<'a, T: Hash + Eq + Clone, S: BuildHasher> HashConsign<T> for &'a mut HConsign<T, S> {
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
+
+impl<'a, T: Hash + Eq, S: BuildHasher> HashConsign<T> for &'a mut HConsign<T, S> {
+    fn mk_is_new<U: HashIntern<T> + Eq + PartialEq<T> + Hash>(self, elm: U) -> (HConsed<T>, bool)
+    where
+        T: Borrow<U>,
+    {
         // If the element is known and upgradable return it.
-        if let Some(hconsed) = self.get(&elm) {
-            debug_assert!(*hconsed.elm == elm);
+        if let Some(hconsed) = self.get::<U>(&elm) {
+            debug_assert!(elm == *hconsed.elm);
             return (hconsed, false);
         }
         // Otherwise build hconsed version.
         let hconsed = HConsed {
-            elm: Arc::new(elm.clone()),
+            elm: Arc::new(elm.intern()),
             uid: self.count,
         };
         // Increment uid count.
         self.count += 1;
         // ...add weak version to the table...
-        self.insert(elm, hconsed.to_weak());
+        self.insert(elm.intern(), hconsed.to_weak());
         // ...and return consed version.
         (hconsed, true)
     }
@@ -700,13 +712,15 @@ macro_rules! get {
 impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
     /// If the element is already in the consign, only read access will be
     /// requested.
-    fn mk_is_new(self, elm: T) -> (HConsed<T>, bool) {
-        // Request read and check if element already exists.
+    fn mk_is_new<U: HashIntern<T> + Eq + PartialEq<T> + Hash>(self, elm: U) -> (HConsed<T>, bool)
+    where
+        T: Borrow<U>,        // Request read and check if element already exists.
+    {
         {
             let slf = get!(read on self);
             // If the element is known and upgradable return it.
             if let Some(hconsed) = slf.get(&elm) {
-                debug_assert!(*hconsed.elm == elm);
+                debug_assert!(elm == *hconsed.elm);
                 return (hconsed, false);
             }
         };
@@ -715,19 +729,19 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
 
         // Someone might have inserted since we checked, check again.
         if let Some(hconsed) = slf.get(&elm) {
-            debug_assert!(*hconsed.elm == elm);
+            debug_assert!(elm == *hconsed.elm);
             return (hconsed, false);
         }
 
         // Otherwise build hconsed version.
         let hconsed = HConsed {
-            elm: Arc::new(elm.clone()),
+            elm: Arc::new(elm.intern()),
             uid: slf.count,
         };
         // Increment uid count.
         slf.count += 1;
         // ...add weak version to the table...
-        slf.insert(elm, hconsed.to_weak());
+        slf.insert(elm.intern(), hconsed.to_weak());
         // ...and return consed version.
         (hconsed, true)
     }
@@ -743,5 +757,19 @@ impl<'a, T: Hash + Eq + Clone> HashConsign<T> for &'a RwLock<HConsign<T>> {
     }
     fn reserve(self, additional: usize) {
         get!(write on self).reserve(additional)
+    }
+}
+
+/// Abstracts conversion and cloning for `hashconsing`
+/// 
+/// `HashIntern` abstracts conversion and cloning, allowing minimal-copy implementations of HConsed
+/// types.
+pub trait HashIntern<T> {
+    fn intern(&self) -> T;
+}
+
+impl<T: Clone> HashIntern<T> for T {
+    fn intern(&self) -> T {
+        self.clone()
     }
 }
