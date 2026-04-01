@@ -545,6 +545,14 @@ impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
         Ok(init)
     }
 
+    #[inline]
+    pub fn contains(&self, elem: &T) -> bool
+    where
+        S: BuildHasher,
+    {
+        self.table.contains_key(elem)
+    }
+
     /// The number of elements stored, mostly for testing.
     #[inline]
     pub fn len(&self) -> usize {
