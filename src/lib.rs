@@ -213,6 +213,8 @@
 //! [lazy static]: https://crates.io/crates/lazy_static
 //! (lazy_static library on crates.io)
 
+#![deny(warnings)]
+
 use std::{
     borrow::Borrow,
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
