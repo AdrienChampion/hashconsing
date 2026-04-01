@@ -545,6 +545,21 @@ impl<T: Hash + Eq + Clone, S> HConsign<T, S> {
         Ok(init)
     }
 
+    /// Returns an iterator to the consign's contents
+    #[inline]
+    pub fn iter(&self) -> impl ExactSizeIterator<Item = &T> {
+        self.table.keys()
+    }
+
+    /// Determine if the consign contains an element
+    #[inline]
+    pub fn contains(&self, elem: &T) -> bool
+    where
+        S: BuildHasher,
+    {
+        self.table.contains_key(elem)
+    }
+
     /// The number of elements stored, mostly for testing.
     #[inline]
     pub fn len(&self) -> usize {
