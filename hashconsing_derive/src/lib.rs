@@ -52,6 +52,10 @@
 //! // Unit variant
 //! let unit = Type::Unit();
 //! assert!(!unit.is_named());
+//!
+//! # // Verify derived traits are inherited by the generated wrapper type
+//! # fn assert_traits<T: std::fmt::Debug + Clone + PartialEq + Eq + PartialOrd + Ord + std::hash::Hash + Send + Sync>() {}
+//! # assert_traits::<Type>();
 //! ```
 //!
 //! Custom factory capacity:
