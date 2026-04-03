@@ -17,4 +17,4 @@ syn = { version = "2.0", features = ["full"] }
 
 # For doc tests
 [dev-dependencies]
-hashconsing = {path = "../hashconsing", features = ["derive"]}
+hashconsing = {path = "..", features = ["derive"]}
