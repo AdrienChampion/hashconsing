@@ -53,6 +53,24 @@
 //! let unit = Type::Unit();
 //! assert!(!unit.is_named());
 //! ```
+//!
+//! Custom factory capacity:
+//! ```rust
+//! use hashconsing::hcons;
+//!
+//! #[hcons(name = "Expr", capacity = 1000)]
+//! #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+//! pub enum ActualExpr {
+//!     Lit(i64),
+//!     Add(Expr, Expr),
+//! }
+//!
+//! let lit = Expr::Lit(42);
+//! let sum = Expr::Add(lit.clone(), lit);
+//!
+//! // Note capacity is imprecise and allowed to allocate more space than expected
+//! assert!(Expr_FACTORY.read().unwrap().capacity() >= 1000);
+//! ```
 
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
 use proc_macro::{self, TokenStream};
@@ -71,6 +89,8 @@ struct MacroArgs {
     name: String,
     no_factory: Flag,
     no_constructors: Flag,
+    #[darling(default)]
+    capacity: Option<usize>,
 }
 
 impl MacroArgs {
@@ -131,9 +151,10 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
         }
     };
 
+    let capacity = args.capacity.unwrap_or(50);
     let hash_factory = quote! {
         hashconsing::consign! {
-            let #factory_name = consign(50) for #ident ;
+            let #factory_name = consign(#capacity) for #ident ;
         }
     };
 
