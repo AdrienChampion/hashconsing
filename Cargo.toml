@@ -5,9 +5,13 @@ members = [
 
 resolver = "2"
 
+[workspace.package]
+version = "1.7.0"
+edition = "2021"
+
 [package]
 name = "hashconsing"
-version = "1.7.0"
+version.workspace = true
 authors = [
   "Adrien Champion <adrien.champion@email.com>",
   "Leni Aniva <aniva@stanford.edu>",
@@ -26,7 +30,7 @@ categories = [
 ]
 keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
 license = "MIT/Apache-2.0"
-edition = "2021"
+edition.workspace = true
 rust-version = "1.60"
 
 [package.metadata.docs.rs]
@@ -40,7 +44,7 @@ derive = ["hashconsing-derive"]
 
 [dependencies]
 lazy_static = "1.*"
-hashconsing-derive = { version = "0.1.0", optional = true, path = "hashconsing_derive" }
+hashconsing-derive = { version = "1.7.0", optional = true, path = "hashconsing_derive" }
 
 [dependencies.ahash]
 version = "^0.8.3"
