@@ -68,8 +68,8 @@
 //! let lit = Expr::Lit(42);
 //! let sum = Expr::Add(lit.clone(), lit);
 //!
-//! // Note capacity is imprecise and allowed to allocate more space than expected
-//! assert!(Expr_FACTORY.read().unwrap().capacity() >= 1000);
+//! # // Note capacity is imprecise and allowed to allocate more space than expected
+//! # assert!(Expr_FACTORY.read().unwrap().capacity() >= 1000);
 //! ```
 
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
