@@ -119,6 +119,7 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
     let hash_struct = quote! {
         #(#attrs)*
         #[automatically_derived]
+        #[repr(transparent)]
         #vis struct #struct_name(hashconsing::HConsed<#ident>);
 
         #[automatically_derived]
