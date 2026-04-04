@@ -39,18 +39,18 @@
 //!     }
 //! }
 //!
-//! let named_type = Type::Named("int".to_string());
+//! let named_type = Type::named("int".to_string());
 //! // Dereferences to the underlying type with access to methods
 //! assert!(named_type.is_named());
-//! let tuple = Type::Tuple(vec![named_type.clone()]);
+//! let tuple = Type::tuple(vec![named_type.clone()]);
 //! assert!(!tuple.is_named());
 //!
 //! // Struct-style variant with named fields
-//! let record = Type::Record(vec![("x".to_string(), named_type)], false);
+//! let record = Type::record(vec![("x".to_string(), named_type)], false);
 //! assert!(record.is_record());
 //!
 //! // Unit variant
-//! let unit = Type::Unit();
+//! let unit = Type::unit();
 //! assert!(!unit.is_named());
 //!
 //! # // Verify derived traits are inherited by the generated wrapper type
@@ -69,13 +69,14 @@
 //!     Add(Expr, Expr),
 //! }
 //!
-//! let lit = Expr::Lit(42);
-//! let sum = Expr::Add(lit.clone(), lit);
+//! let lit = Expr::lit(42);
+//! let sum = Expr::add(lit.clone(), lit);
 //!
 //! # // Note capacity is imprecise and allowed to allocate more space than expected
 //! # assert!(Expr_FACTORY.read().unwrap().capacity() >= 1000);
 //! ```
 
+use convert_case::{Case, Casing};
 use darling::{ast::NestedMeta, util::Flag, Error, FromMeta, Result};
 use proc_macro::{self, TokenStream};
 use proc_macro2::Span;
@@ -164,7 +165,9 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
 
     let hash_impl = match data {
         Data::Enum(DataEnum { variants, .. }) => {
-            let variant_names = variants.iter().map(|v| &v.ident);
+            let variant_names = variants
+                .iter()
+                .map(|v| format_ident!("{}", v.ident.to_string().to_case(Case::Snake)));
             let (variant_field_function_args, variant_field_calling_args): (
                 Vec<Punctuated<FnArg, Token![,]>>,
                 Vec<Expr>,
@@ -314,7 +317,6 @@ pub fn hcons(args: TokenStream, mut input: TokenStream) -> TokenStream {
 
             quote! {
                 #[automatically_derived]
-                #[allow(non_snake_case)]
                 impl #struct_name {
                     #(pub fn #variant_names(#variant_field_function_args) -> Self {
                         use hashconsing::HashConsign;
