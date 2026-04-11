@@ -23,13 +23,13 @@ jobs:
       with:
         rustflags: ""
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --workspace --all-features --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace --all-features --verbose
     - name: Build doc
-      run: cargo doc --verbose
+      run: cargo doc --workspace --all-features --verbose
     - name: Run clippy
-      run: cargo clippy --verbose
+      run: cargo clippy --workspace --all-features --verbose
     - name: Run rustfmt
       run: cargo fmt --verbose --check
     - name: Build release

@@ -322,7 +322,7 @@ where
 {
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter<'a>(&'a self) -> ::std::collections::hash_set::Iter<'a, HConsed<T::Inner>> {
+    pub fn iter(&self) -> ::std::collections::hash_set::Iter<'_, HConsed<T::Inner>> {
         self.set.iter()
     }
 }
@@ -520,14 +520,12 @@ where
 {
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter<'a>(&'a self) -> ::std::collections::hash_map::Iter<'a, HConsed<T::Inner>, V> {
+    pub fn iter(&self) -> ::std::collections::hash_map::Iter<'_, HConsed<T::Inner>, V> {
         self.map.iter()
     }
     /// An iterator visiting all elements.
     #[inline]
-    pub fn iter_mut<'a>(
-        &'a mut self,
-    ) -> ::std::collections::hash_map::IterMut<'a, HConsed<T::Inner>, V> {
+    pub fn iter_mut(&mut self) -> ::std::collections::hash_map::IterMut<'_, HConsed<T::Inner>, V> {
         self.map.iter_mut()
     }
 }

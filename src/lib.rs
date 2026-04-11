@@ -227,6 +227,14 @@ use std::{
 
 pub extern crate lazy_static;
 
+#[cfg(feature = "derive")]
+#[allow(unused_imports)]
+#[macro_use]
+extern crate hashconsing_derive;
+#[cfg(feature = "derive")]
+#[doc(hidden)]
+pub use hashconsing_derive::*;
+
 #[cfg(test)]
 mod test;
 
@@ -240,8 +248,7 @@ mod test;
 /// - `$capa:expr` initial capacity when creating the consign ;
 /// - `$hash_builder:expr` optional hash builder, an
 ///   implementation of [`std::hash::BuildHasher`] ;
-/// - `$typ:typ,` type being hashconsed (the underlying type, not the
-///   hashconsed one) ;
+/// - `$typ:typ,` type being hashconsed (the underlying type, not the hashconsed one) ;
 #[macro_export]
 macro_rules! consign {
     (
