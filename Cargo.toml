@@ -38,9 +38,10 @@ features = ["unstable_docrs"]
 
 [features]
 with_ahash = ["ahash"]
-unstable_docrs = ["with_ahash"]
+unstable_docrs = ["with_ahash", "bumpalo"]
 weak-table = ["dep:weak-table"]
 derive = ["hashconsing-derive"]
+bumpalo = ["dep:bumpalo"]
 
 [dependencies]
 lazy_static = "1.*"
@@ -54,7 +55,16 @@ optional = true
 version = "^0.3.0"
 optional = true
 
+[dependencies.bumpalo]
+version = "^3.16"
+optional = true
+
 [dev-dependencies]
 crossbeam-utils = "^0.8"
 rayon = "^1.5"
 rand = "0.8"
+
+[[bench]]
+name = "arena_vs_arc"
+harness = false
+required-features = ["bumpalo"]

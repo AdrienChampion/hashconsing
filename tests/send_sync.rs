@@ -56,3 +56,67 @@ fn rayon() {
         })
         .collect::<()>();
 }
+
+#[cfg(feature = "bumpalo")]
+mod arena {
+    use hashconsing::arena::{bumpalo::Bump, BHConsed, BHConsign};
+
+    use rayon::prelude::*;
+
+    type Tree<'b> = BHConsed<'b, RawTree<'b>>;
+
+    #[derive(Debug, PartialEq, Eq, Hash)]
+    enum RawTree<'b> {
+        Node(Tree<'b>, usize, Tree<'b>),
+        Leaf(usize),
+    }
+
+    #[test]
+    fn rayon() {
+        let arena = Bump::new();
+        let mut consign: BHConsign<'_, RawTree<'_>> = BHConsign::new(&arena);
+        macro_rules! tree {
+            ($val:expr) => {
+                consign.mk(RawTree::Leaf($val))
+            };
+            ($lft: expr, $val:expr, $rgt:expr) => {
+                consign.mk(RawTree::Node($lft, $val, $rgt))
+            };
+        }
+
+        let t_7 = tree!(7);
+        let t_5 = tree!(5);
+        let t_3 = tree!(3);
+        let t_2 = tree!(2);
+        let t_1 = tree!(1);
+
+        let t_10 = tree!(t_1, 3, t_2);
+        let t_11 = tree!(t_10, 6, t_3);
+        let t_12 = tree!(t_11, 11, t_5);
+        let t_13 = tree!(t_12, 18, t_7);
+
+        let forest = vec![t_7, t_5, t_3, t_2, t_1, t_10, t_11, t_12, t_13];
+        let verbose = false;
+
+        forest
+            .par_iter()
+            .map(|tree| {
+                if verbose {
+                    println!("{tree:?}")
+                }
+            })
+            .collect::<()>();
+
+        forest
+            .clone()
+            .into_par_iter()
+            .map(|tree| {
+                if verbose {
+                    println!("{tree:?}")
+                }
+            })
+            .collect::<()>();
+
+        assert_eq!(forest.len(), 9);
+    }
+}
