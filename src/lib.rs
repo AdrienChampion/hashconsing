@@ -335,6 +335,40 @@ impl<T> HConsed<T> {
     pub fn arc_count(&self) -> usize {
         Arc::strong_count(&self.elm)
     }
+
+    /// Returns the element if `this` is the last strong reference to it, and `this` itself
+    /// otherwise.
+    ///
+    /// Succeeds even when weak references are outstanding, such as the entry a consign keeps for
+    /// the element: those weak references stop upgrading afterwards, exactly as they do when the
+    /// last `HConsed` is dropped.
+    ///
+    /// This is the only way to take ownership of an element instead of letting the `Arc` drop it
+    /// in place, which is what makes stack-free deallocation of deeply nested elements possible.
+    /// Dropping a `HConsed` whose element holds other `HConsed`s recurses once per nesting level,
+    /// so a deep enough element overflows the native stack — see `examples/deep_drop.rs`. With
+    /// `try_unwrap`, a `Drop` implementation on the element type can move its children onto an
+    /// explicit worklist before the element is dropped, keeping the stack depth constant.
+    ///
+    /// ```rust
+    /// use hashconsing::{HConsed, HConsign, HashConsign};
+    ///
+    /// let mut factory: HConsign<usize> = HConsign::empty();
+    /// let elm = factory.mk(1);
+    ///
+    /// // The consign only keeps a weak reference, so `elm` is the last strong one.
+    /// let clone = elm.clone();
+    /// let elm = HConsed::try_unwrap(elm).expect_err("`clone` is still around");
+    /// drop(clone);
+    /// assert_eq!(HConsed::try_unwrap(elm), Ok(1));
+    ///
+    /// // The consign's entry can no longer be upgraded, so it hands out a fresh element.
+    /// assert_eq!(*factory.mk(1).get(), 1);
+    /// ```
+    pub fn try_unwrap(this: Self) -> Result<T, Self> {
+        let HConsed { elm, uid } = this;
+        Arc::try_unwrap(elm).map_err(|elm| HConsed { elm, uid })
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for HConsed<T> {
