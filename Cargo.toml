@@ -1,12 +1,10 @@
 [workspace]
-members = [
-    "hashconsing_derive",
-]
+members = ["hashconsing_derive"]
 
 resolver = "2"
 
 [workspace.package]
-version = "1.7.0"
+version = "1.8.0"
 edition = "2021"
 
 [package]
