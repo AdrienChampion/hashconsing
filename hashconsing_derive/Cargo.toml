@@ -2,6 +2,23 @@
 name = "hashconsing-derive"
 version.workspace = true
 edition.workspace = true
+description = "Provides derive features for the hashconsing crate."
+authors = [
+  "Adrien Champion <adrien.champion@email.com>",
+  "Leni Aniva <aniva@stanford.edu>",
+]
+homepage = "https://github.com/AdrienChampion/hashconsing"
+repository = "https://github.com/AdrienChampion/hashconsing"
+readme = "README.md"
+categories = [
+  "caching",
+  "compression",
+  "concurrency",
+  "data-structures",
+  "memory-management",
+]
+keywords = ["hashconsing", "hash", "consing", "sharing", "caching"]
+license = "MIT/Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -18,4 +35,4 @@ syn = { version = "2.0", features = ["full"] }
 
 # For doc tests
 [dev-dependencies]
-hashconsing = {path = "..", features = ["derive"]}
+hashconsing = { path = "..", features = ["derive"] }
