@@ -201,6 +201,13 @@
 //! Another way to have efficient sets/maps of/from hashconsed things is to use the `BTree` sets
 //! and maps from the standard library.
 //!
+//! # Arena-backed hashconsing
+//!
+//! Activating feature `bumpalo` exposes the `arena` module, which provides `BHConsed` and
+//! `BHConsign`: the same hashconsing API backed by a `bumpalo` arena instead of `Arc`. Handles are
+//! `Copy`, the consign needs no `Clone` bound, and memory is reclaimed only when the arena is
+//! dropped — see that module's documentation for the destructor caveat.
+//!
 //! [paper]: http://dl.acm.org/citation.cfm?doid=1159876.1159880
 //! (Type-safe modular hash-consing)
 //! [`HConsed`]: trait.HashConsed.html (HConsed type)
@@ -285,6 +292,14 @@ macro_rules! consign {
 )]
 pub mod coll;
 pub mod hash_coll;
+
+/// Arena-backed hashconsing, on top of [`bumpalo`](https://crates.io/crates/bumpalo).
+///
+/// > **NB:** requires feature `"bumpalo"`.
+#[cfg(feature = "bumpalo")]
+pub mod arena;
+#[cfg(feature = "bumpalo")]
+pub use arena::{BHConsed, BHConsign};
 
 /// Internal trait used to recognize hashconsed things.
 ///
